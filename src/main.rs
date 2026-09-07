@@ -1,3 +1,4 @@
+mod cat;
 mod config;
 mod dsp;
 mod iq;
