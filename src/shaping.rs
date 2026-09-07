@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 pub fn shape_row(bins: &[u8], start: usize, end: usize, out_width: usize) -> Vec<u8> {
     let slice = &bins[start..end];
     let n = slice.len();

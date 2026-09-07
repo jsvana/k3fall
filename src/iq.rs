@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use anyhow::Result;
 use num_complex::Complex;
 use std::f32::consts::TAU;

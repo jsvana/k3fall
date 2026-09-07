@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use crate::config::DspConfig;
 use crate::iq::IqSource;
 use num_complex::Complex;
@@ -8,6 +6,7 @@ use std::collections::VecDeque;
 use std::f32::consts::TAU;
 use std::sync::Arc;
 
+#[derive(Clone)]
 pub struct SpectrumRow {
     pub seq: u32,
     pub bins: Arc<Vec<u8>>,
