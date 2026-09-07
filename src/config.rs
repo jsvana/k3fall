@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 use std::path::PathBuf;
@@ -52,8 +52,10 @@ pub struct BandConfig {
 
 impl Config {
     pub fn load(path: &Path) -> Result<Config> {
-        let content = std::fs::read_to_string(path)?;
-        let config = toml::from_str(&content)?;
+        let content = std::fs::read_to_string(path)
+            .with_context(|| format!("failed to read config file {}", path.display()))?;
+        let config = toml::from_str(&content)
+            .with_context(|| format!("failed to parse config file {}", path.display()))?;
         Ok(config)
     }
 

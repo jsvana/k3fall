@@ -77,9 +77,18 @@ fn parse_mode(payload: &str, raw: &str) -> CatEvent {
     CatEvent::Mode(mode.to_string())
 }
 
+/// The K3 `FA`/`FB` command format has room for exactly 11 digits of
+/// frequency (Hz); this is the largest value that fits.
+const MAX_FA_HZ: u64 = 99_999_999_999;
+
 /// Format a K3 `FA` tune command for `freq_hz`, rounded to the nearest 10 Hz.
+///
+/// Uses `saturating_add` and clamps to `MAX_FA_HZ` before formatting so a
+/// pathological/adversarial `freq_hz` (e.g. `u64::MAX`, which would overflow
+/// `freq_hz + 5` in debug builds) can't panic this task or produce a
+/// malformed (>11-digit) command.
 pub fn tune_command(freq_hz: u64) -> String {
-    let rounded = (freq_hz + 5) / 10 * 10;
+    let rounded = (freq_hz.saturating_add(5) / 10 * 10).min(MAX_FA_HZ);
     format!("FA{rounded:011};")
 }
 
@@ -393,6 +402,16 @@ mod tests {
     fn tune_command_rounds_to_10hz() {
         assert_eq!(tune_command(14_032_504), "FA00014032500;");
         assert_eq!(tune_command(14_032_505), "FA00014032510;");
+    }
+
+    #[test]
+    fn tune_command_clamps_pathological_frequency_without_panicking() {
+        let cmd = tune_command(u64::MAX);
+        assert_eq!(cmd, "FA99999999999;");
+        // 11 digits between "FA" and ";" -- never a malformed (wider) command.
+        let digits = &cmd[2..cmd.len() - 1];
+        assert_eq!(digits.len(), 11);
+        assert!(digits.chars().all(|c| c.is_ascii_digit()));
     }
 
     #[test]

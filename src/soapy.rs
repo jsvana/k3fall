@@ -24,6 +24,14 @@ const IF_BANDWIDTH_HZ: f64 = 200_000.0;
 /// Timeout for a single stream read, in microseconds.
 const READ_TIMEOUT_US: i64 = 1_000_000;
 
+/// How many consecutive benign (`Timeout`/`Overflow`) read errors with no
+/// samples delivered we tolerate before giving up and forcing a device
+/// re-open. `Overflow` in particular is routine for SoapySDRPlay3 (an
+/// internal buffer briefly filled) and self-corrects; but if it's *all*
+/// we're getting for this many reads in a row, something is actually stuck
+/// and reopening the device is more likely to recover than looping forever.
+const CONSECUTIVE_BENIGN_ERROR_LIMIT: u32 = 30;
+
 /// An `IqSource` backed by a real SDRplay RSP2pro via SoapySDR.
 ///
 /// The stream keeps its own handle to the underlying `Device` (the
@@ -32,6 +40,10 @@ const READ_TIMEOUT_US: i64 = 1_000_000;
 pub struct SoapySource {
     stream: RxStream<Complex<f32>>,
     sample_rate: u32,
+    /// Consecutive `Timeout`/`Overflow` reads since the last successful
+    /// read; reset to 0 whenever `stream.read` returns `Ok`. See
+    /// `CONSECUTIVE_BENIGN_ERROR_LIMIT`.
+    consecutive_benign_errors: u32,
 }
 
 impl SoapySource {
@@ -79,15 +91,45 @@ impl SoapySource {
         Ok(Self {
             stream,
             sample_rate: cfg.sample_rate,
+            consecutive_benign_errors: 0,
         })
     }
 }
 
 impl IqSource for SoapySource {
     fn read(&mut self, buf: &mut [Complex<f32>]) -> Result<usize> {
-        self.stream
-            .read(&mut [buf], READ_TIMEOUT_US)
-            .map_err(|err| anyhow::anyhow!("sdrplay stream read error: {err}"))
+        match self.stream.read(&mut [buf], READ_TIMEOUT_US) {
+            Ok(n) => {
+                self.consecutive_benign_errors = 0;
+                Ok(n)
+            }
+            // `Timeout` and `Overflow` are routine for SoapySDRPlay3 (no
+            // samples ready yet / an internal buffer briefly filled) and
+            // are not signs the device is gone: report zero samples read
+            // rather than tearing the source down. The DSP loop treats
+            // `Ok(0)` as a no-op iteration, and the 1s read timeout above
+            // already self-paces the retry -- no busy loop. If these are
+            // all we're getting for too long in a row, escalate to an error
+            // so the caller reopens the device.
+            Err(err)
+                if matches!(
+                    err.code,
+                    soapysdr::ErrorCode::Timeout | soapysdr::ErrorCode::Overflow
+                ) =>
+            {
+                tracing::debug!("sdrplay stream read: benign error ({:?}): {err}", err.code);
+                self.consecutive_benign_errors += 1;
+                if self.consecutive_benign_errors >= CONSECUTIVE_BENIGN_ERROR_LIMIT {
+                    anyhow::bail!(
+                        "sdrplay stream stuck: {} consecutive benign errors ({:?}) with no samples delivered",
+                        self.consecutive_benign_errors,
+                        err.code
+                    );
+                }
+                Ok(0)
+            }
+            Err(err) => Err(anyhow::anyhow!("sdrplay stream read error: {err}")),
+        }
     }
 
     fn sample_rate(&self) -> u32 {

@@ -1,6 +1,5 @@
 use std::collections::VecDeque;
 use std::pin::Pin;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -36,7 +35,10 @@ pub struct AppState {
     pub rig: watch::Receiver<RigState>,
     pub tune: mpsc::Sender<u64>,
     pub cfg: Arc<Config>,
-    pub sdr_ok: Arc<AtomicBool>,
+    /// Live SDR-open/streaming status. `watch` (rather than a plain flag)
+    /// lets active websocket sessions react immediately when it changes
+    /// instead of only reporting the value seen at connect time.
+    pub sdr_ok_rx: watch::Receiver<bool>,
 }
 
 pub fn router(state: AppState) -> Router {
@@ -169,6 +171,31 @@ async fn send_rig(
     send_json(sender, &msg).await
 }
 
+/// Send a `Status` frame reflecting the current `sdr_ok`/`cat_ok` state.
+///
+/// Called once at connect and again any time `state.sdr_ok_rx` changes, so
+/// clients learn about SDR reconnects/drops without having to reconnect
+/// their websocket (finding I3).
+async fn send_status(
+    sender: &mut SplitSink<WebSocket, Message>,
+    state: &AppState,
+    sdr_ok: bool,
+    fft_size: u32,
+    bin_hz: f32,
+    sample_rate: u32,
+) -> Result<(), axum::Error> {
+    let msg = ServerMsg::Status {
+        sdr_ok,
+        cat_ok: state.rig.borrow().connected,
+        fft_size,
+        bin_hz,
+        rows_per_sec: state.cfg.dsp.rows_per_sec,
+        center_hz: state.cfg.sdr.center_hz,
+        sample_rate,
+    };
+    send_json(sender, &msg).await
+}
+
 /// Try to push the most recently computed row frame through the socket
 /// without blocking the session loop.
 ///
@@ -222,16 +249,19 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
     // Lower clamp bound for a client-requested span: at least one bin wide.
     let min_span_hz = bin_hz.max(1.0).ceil() as u32;
 
-    let status = ServerMsg::Status {
-        sdr_ok: state.sdr_ok.load(Ordering::Relaxed),
-        cat_ok: state.rig.borrow().connected,
-        fft_size: fft_size as u32,
+    let mut sdr_ok_rx = state.sdr_ok_rx.clone();
+    let initial_sdr_ok = *sdr_ok_rx.borrow();
+    if send_status(
+        &mut sender,
+        &state,
+        initial_sdr_ok,
+        fft_size as u32,
         bin_hz,
-        rows_per_sec: state.cfg.dsp.rows_per_sec,
-        center_hz: state.cfg.sdr.center_hz,
         sample_rate,
-    };
-    if send_json(&mut sender, &status).await.is_err() {
+    )
+    .await
+    .is_err()
+    {
         return;
     }
     if send_rig(&mut sender, &state).await.is_err() {
@@ -241,6 +271,7 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
     let mut rows_rx = state.rows.subscribe();
     let mut rig_rx = state.rig.clone();
     let mut rig_closed = false;
+    let mut sdr_ok_closed = false;
     let mut view = View::new(sample_rate);
     let mut tune_timestamps: VecDeque<Instant> = VecDeque::with_capacity(TUNE_RATE_LIMIT);
     // Holds at most one not-yet-sent row frame: the newest one, so a slow
@@ -294,6 +325,24 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
                     }
                 }
             }
+            changed = sdr_ok_rx.changed(), if !sdr_ok_closed => {
+                match changed {
+                    Ok(()) => {
+                        let sdr_ok = *sdr_ok_rx.borrow();
+                        if send_status(&mut sender, &state, sdr_ok, fft_size as u32, bin_hz, sample_rate)
+                            .await
+                            .is_err()
+                        {
+                            break;
+                        }
+                    }
+                    Err(_) => {
+                        // Sender side closed; stop selecting on this branch
+                        // so we don't spin on an already-resolved future.
+                        sdr_ok_closed = true;
+                    }
+                }
+            }
             msg = receiver.next() => {
                 match msg {
                     Some(Ok(Message::Text(text))) => {
@@ -339,12 +388,31 @@ async fn handle_client_text(
             view.apply(width, span_hz, center_offset_hz, sample_rate, min_span_hz);
         }
         Ok(ClientMsg::Tune { freq_hz }) => {
-            let connected = state.rig.borrow().connected;
-            if !connected {
+            let rig = state.rig.borrow().clone();
+            if !rig.connected {
                 let _ = send_json(
                     sender,
                     &ServerMsg::Error {
                         message: "CAT disconnected; cannot tune".to_string(),
+                    },
+                )
+                .await;
+                return;
+            }
+
+            // Reject requests outside the span currently displayed to this
+            // session -- the same center/span used to build the row frames
+            // it's been sent (finding I4). Uses saturating arithmetic since
+            // `freq_hz` is client-controlled and can be adversarial.
+            let center = effective_center(&state.cfg, &rig);
+            let half_span = (view.span_hz / 2) as u64;
+            let lo = center.saturating_sub(half_span);
+            let hi = center.saturating_add(half_span);
+            if freq_hz < lo || freq_hz > hi {
+                let _ = send_json(
+                    sender,
+                    &ServerMsg::Error {
+                        message: "tune outside displayed span".to_string(),
                     },
                 )
                 .await;

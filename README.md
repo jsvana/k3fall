@@ -90,6 +90,26 @@ Config sections:
 
 - **`[server]`**: Web server listen address and port.
 
+## Build Prerequisites (Pi)
+
+`make deploy` builds on the Pi itself with `--features soapy`, which needs a Rust toolchain and several native dev packages beyond the runtime SoapySDR/SDRplay packages installed above (those provide the *libraries*, not the headers/build tooling `cargo build` needs to link against them).
+
+Install Rust (if not already present):
+
+```bash
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+```
+
+Install native build dependencies:
+
+```bash
+sudo apt install build-essential pkg-config libudev-dev libclang-dev libsoapysdr-dev
+```
+
+- `build-essential`, `pkg-config`: standard toolchain needed by most `-sys` crates.
+- `libudev-dev`: required by the `serialport` crate (K3 CAT serial port).
+- `libclang-dev`, `libsoapysdr-dev`: required by `soapysdr-sys`'s bindgen step — `libsoapysdr-dev` provides the SoapySDR *headers*, which are not included in the `soapysdr-module-sdrplay3`/`soapysdr-tools` runtime packages installed in step 2 above.
+
 ## Deploy to Raspberry Pi
 
 Run from your dev machine with k3fall source and SSH access to the Pi:

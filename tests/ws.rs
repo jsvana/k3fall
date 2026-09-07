@@ -5,7 +5,6 @@ use k3fall::dsp::{run_dsp_thread, SpectrumRow};
 use k3fall::iq::{tone, FileSource};
 use k3fall::protocol::{decode_row, ServerMsg};
 use k3fall::web::{router, AppState};
-use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::net::TcpListener;
@@ -27,12 +26,11 @@ async fn websocket_streams_status_then_shaped_row() {
     let (rows_tx, _rows_rx) = broadcast::channel::<SpectrumRow>(32);
     let (_rig_tx, rig_rx) = watch::channel(RigState::default());
     let (tune_tx, _tune_rx) = mpsc::channel::<u64>(8);
-    let sdr_ok = Arc::new(AtomicBool::new(true));
+    let (sdr_ok_tx, sdr_ok_rx) = watch::channel(true);
 
     {
         let rows_tx = rows_tx.clone();
         let dsp_cfg = cfg.dsp.clone();
-        let sdr_ok = sdr_ok.clone();
         // The reconnect loop only calls this closure once here since the
         // in-memory tone source never errors; pace=true keeps the thread
         // from flooding the broadcast channel faster than the test can keep
@@ -45,7 +43,7 @@ async fn websocket_streams_status_then_shaped_row() {
                 )
             });
         std::thread::spawn(move || {
-            run_dsp_thread(make_source, dsp_cfg, rows_tx, true, sdr_ok);
+            run_dsp_thread(make_source, dsp_cfg, rows_tx, true, sdr_ok_tx);
         });
     }
 
@@ -54,7 +52,7 @@ async fn websocket_streams_status_then_shaped_row() {
         rig: rig_rx,
         tune: tune_tx,
         cfg: cfg.clone(),
-        sdr_ok,
+        sdr_ok_rx,
     };
 
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();

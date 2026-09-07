@@ -1,5 +1,4 @@
 use std::path::Path;
-use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 
 use anyhow::Context;
@@ -21,15 +20,23 @@ async fn main() {
     let (cfg, make_source, pace) = if path.exists() {
         match Config::load(path) {
             Ok(cfg) => {
+                // Only the synthetic `file` driver needs the DSP thread to
+                // pace itself with `sleep`s; real hardware sources block in
+                // their own `read()` until samples are actually available,
+                // so pacing on top of that would starve them and cause
+                // permanent overrun (see finding C1).
+                let pace = cfg.sdr.driver == "file";
                 let make_source = build_source(&cfg);
-                (cfg, make_source, true)
+                (cfg, make_source, pace)
             }
             Err(err) => {
-                tracing::error!(
-                    "failed to load config {}: {err}; falling back to dev mode",
-                    path.display()
-                );
-                dev_mode()
+                // The config file exists but couldn't be read/parsed: this
+                // is almost certainly an operator mistake (bad TOML,
+                // permissions), and silently falling back to dev mode would
+                // hide it under systemd (no listen port on LAN, no real
+                // signal). Fail fast instead so the error is visible.
+                tracing::error!("failed to load config {}: {err:#}", path.display());
+                std::process::exit(1);
             }
         }
     } else {
@@ -41,16 +48,15 @@ async fn main() {
     };
 
     let cfg = Arc::new(cfg);
-    let sdr_ok = Arc::new(AtomicBool::new(false));
+    let (sdr_ok_tx, sdr_ok_rx) = tokio::sync::watch::channel(false);
 
     let (rows_tx, _rows_rx) = tokio::sync::broadcast::channel::<dsp::SpectrumRow>(32);
 
     {
         let rows_tx = rows_tx.clone();
         let dsp_cfg = cfg.dsp.clone();
-        let sdr_ok = sdr_ok.clone();
         std::thread::spawn(move || {
-            dsp::run_dsp_thread(make_source, dsp_cfg, rows_tx, pace, sdr_ok)
+            dsp::run_dsp_thread(make_source, dsp_cfg, rows_tx, pace, sdr_ok_tx)
         });
     }
 
@@ -75,7 +81,7 @@ async fn main() {
         rig: rig_rx,
         tune: tune_tx,
         cfg: cfg.clone(),
-        sdr_ok,
+        sdr_ok_rx,
     };
 
     let app = web::router(state);

@@ -4,8 +4,8 @@ use num_complex::Complex;
 use rustfft::{Fft, FftPlanner};
 use std::collections::VecDeque;
 use std::f32::consts::TAU;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use tokio::sync::watch;
 
 #[derive(Clone)]
 pub struct SpectrumRow {
@@ -112,13 +112,16 @@ const RECONNECT_DELAY: std::time::Duration = std::time::Duration::from_secs(3);
 /// `sdr_ok` reflects whether a source is currently open and being read from
 /// successfully; it flips to `false` while there is no live source (either
 /// because `make_source` is failing, or the previous source's stream just
-/// errored and hasn't been replaced yet).
+/// errored and hasn't been replaced yet). It's a `watch` sender (rather than
+/// a plain flag) so websocket sessions can react to changes immediately
+/// instead of only seeing the value at connect time; `send_replace` is sync,
+/// so it can be called directly from this blocking `std::thread`.
 pub fn run_dsp_thread(
     make_source: Box<dyn FnMut() -> anyhow::Result<Box<dyn IqSource>> + Send>,
     cfg: DspConfig,
     tx: tokio::sync::broadcast::Sender<SpectrumRow>,
     pace: bool,
-    sdr_ok: Arc<AtomicBool>,
+    sdr_ok: watch::Sender<bool>,
 ) {
     run_dsp_thread_with_delay(make_source, cfg, tx, pace, sdr_ok, RECONNECT_DELAY)
 }
@@ -131,7 +134,7 @@ pub fn run_dsp_thread_with_delay(
     cfg: DspConfig,
     tx: tokio::sync::broadcast::Sender<SpectrumRow>,
     pace: bool,
-    sdr_ok: Arc<AtomicBool>,
+    sdr_ok: watch::Sender<bool>,
     reconnect_delay: std::time::Duration,
 ) {
     let mut seq: u32 = 0;
@@ -140,13 +143,13 @@ pub fn run_dsp_thread_with_delay(
         let mut source = match make_source() {
             Ok(source) => source,
             Err(err) => {
-                sdr_ok.store(false, Ordering::Relaxed);
+                sdr_ok.send_replace(false);
                 tracing::warn!("failed to open IQ source: {err}; retrying in {reconnect_delay:?}");
                 std::thread::sleep(reconnect_delay);
                 continue;
             }
         };
-        sdr_ok.store(true, Ordering::Relaxed);
+        sdr_ok.send_replace(true);
 
         let sample_rate = source.sample_rate();
         let mut dsp = Dsp::new(&cfg, sample_rate);
@@ -171,7 +174,7 @@ pub fn run_dsp_thread_with_delay(
                     }
                 }
                 Err(e) => {
-                    sdr_ok.store(false, Ordering::Relaxed);
+                    sdr_ok.send_replace(false);
                     tracing::warn!(
                         "dsp source read error: {e}; dropping source and retrying in {reconnect_delay:?}"
                     );
@@ -191,7 +194,7 @@ mod tests {
     use super::*;
     use crate::config::DspConfig;
     use crate::iq::{tone, FileSource};
-    use std::sync::atomic::AtomicUsize;
+    use std::sync::atomic::{AtomicUsize, Ordering};
     use std::time::Duration;
 
     fn cfg() -> DspConfig {
@@ -322,17 +325,16 @@ mod tests {
         };
 
         let (tx, mut rx) = tokio::sync::broadcast::channel::<SpectrumRow>(16);
-        let sdr_ok = Arc::new(AtomicBool::new(false));
+        let (sdr_ok_tx, sdr_ok_rx) = watch::channel(false);
 
         {
-            let sdr_ok = sdr_ok.clone();
             std::thread::spawn(move || {
                 run_dsp_thread_with_delay(
                     make_source,
                     reconnect_test_cfg(),
                     tx,
                     false,
-                    sdr_ok,
+                    sdr_ok_tx,
                     Duration::from_millis(5),
                 );
             });
@@ -344,7 +346,7 @@ mod tests {
             .expect("broadcast channel closed unexpectedly");
         assert!(!row.bins.is_empty());
         assert!(
-            sdr_ok.load(Ordering::SeqCst),
+            *sdr_ok_rx.borrow(),
             "sdr_ok should be true once a source is open and streaming"
         );
         assert_eq!(
@@ -387,17 +389,16 @@ mod tests {
         };
 
         let (tx, mut rx) = tokio::sync::broadcast::channel::<SpectrumRow>(16);
-        let sdr_ok = Arc::new(AtomicBool::new(false));
+        let (sdr_ok_tx, sdr_ok_rx) = watch::channel(false);
 
         {
-            let sdr_ok = sdr_ok.clone();
             std::thread::spawn(move || {
                 run_dsp_thread_with_delay(
                     make_source,
                     reconnect_test_cfg(),
                     tx,
                     false,
-                    sdr_ok,
+                    sdr_ok_tx,
                     Duration::from_millis(5),
                 );
             });
@@ -413,7 +414,7 @@ mod tests {
         // sdr_ok should flip false once that next read errors and the
         // source is dropped, ahead of the replacement being opened.
         let deadline = tokio::time::Instant::now() + Duration::from_secs(2);
-        while sdr_ok.load(Ordering::SeqCst) {
+        while *sdr_ok_rx.borrow() {
             assert!(
                 tokio::time::Instant::now() < deadline,
                 "sdr_ok never flipped false after the read error"
@@ -428,7 +429,7 @@ mod tests {
             .expect("timed out waiting for a row from the replacement source")
             .expect("broadcast channel closed unexpectedly");
         assert!(
-            sdr_ok.load(Ordering::SeqCst),
+            *sdr_ok_rx.borrow(),
             "sdr_ok should be true again once the replacement source is streaming"
         );
         assert_eq!(
