@@ -1,2 +1,4 @@
 /target
 config.toml
+/image/*.img
+/image/*.img.xz
