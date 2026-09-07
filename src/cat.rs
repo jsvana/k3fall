@@ -150,15 +150,70 @@ const RECONNECT_BACKOFF: Duration = Duration::from_secs(3);
 const KEEPALIVE_INTERVAL: Duration = Duration::from_secs(2);
 const READ_TIMEOUT: Duration = Duration::from_millis(100);
 const READ_CHUNK: usize = 256;
+/// Consecutive zero-byte reads (distinct from read timeouts) tolerated before
+/// a serial port is declared hung up. On POSIX ttys a `read()` returning 0
+/// typically means the far end went away; treating a single zero read as fatal
+/// risks false positives, so we require a short run of them, pausing between
+/// each so a misbehaving driver can't spin a blocking-pool thread at 100%.
+const MAX_CONSECUTIVE_ZERO_READS: u32 = 3;
+const ZERO_READ_PAUSE: Duration = Duration::from_millis(100);
+
+/// Write `bytes` to the serial port via `spawn_blocking`, since `SerialPort`'s
+/// `Write` impl is blocking and must not run directly on an async task.
+/// Takes the writer out of `writer_slot` for the duration of the blocking
+/// call and always puts it back, so the caller can keep reusing the same
+/// `Option` across writes for the life of a connection.
+async fn write_blocking(
+    writer_slot: &mut Option<Box<dyn serialport::SerialPort>>,
+    bytes: Vec<u8>,
+) -> std::io::Result<()> {
+    let mut w = writer_slot
+        .take()
+        .expect("writer missing from slot: previous write_blocking call must not have restored it");
+    let (w, res) = tokio::task::spawn_blocking(move || {
+        let res = w.write_all(&bytes);
+        (w, res)
+    })
+    .await
+    .expect("CAT write blocking task panicked");
+    *writer_slot = Some(w);
+    res
+}
+
+/// Wait out `dur` while still observing `tune_rx`. Tune requests that arrive
+/// while disconnected (open-retry or reconnect backoff) are logged and
+/// dropped rather than queued — they don't shorten or interrupt the backoff.
+/// Returns `true` if `tune_rx`'s sender was dropped, meaning the caller
+/// should shut `run_cat_task` down entirely instead of retrying.
+async fn backoff_or_shutdown(dur: Duration, tune_rx: &mut mpsc::Receiver<u64>) -> bool {
+    let sleep = tokio::time::sleep(dur);
+    tokio::pin!(sleep);
+    loop {
+        tokio::select! {
+            _ = &mut sleep => return false,
+            msg = tune_rx.recv() => {
+                match msg {
+                    Some(freq_hz) => {
+                        tracing::debug!(freq_hz, "dropping tune request while CAT disconnected");
+                    }
+                    None => return true,
+                }
+            }
+        }
+    }
+}
 
 /// Drives a K3 CAT session over `cfg.device`: connects (with reconnect/backoff),
 /// reports rig state changes on `state_tx`, forwards tune requests received on
 /// `tune_rx` to the rig, and keeps the link alive with periodic `FA;` polls.
 ///
 /// Reads happen in `spawn_blocking` (the `serialport` handle is blocking) with
-/// a 100 ms timeout so the task stays responsive to `tune_rx` and shutdown.
-/// Any I/O error other than a read timeout tears down the connection, marks
-/// `connected: false`, and retries after a 3 s backoff.
+/// a 100 ms timeout so the task stays responsive to `tune_rx` and shutdown;
+/// writes go through `spawn_blocking` too, so a stalled UART can't block the
+/// tokio worker thread. Any I/O error other than a read timeout tears down
+/// the connection, marks `connected: false`, and retries after a 3 s backoff
+/// (which itself stays responsive to `tune_rx`'s sender being dropped, so
+/// shutdown during backoff doesn't retry forever).
 pub async fn run_cat_task(
     cfg: CatConfig,
     state_tx: watch::Sender<RigState>,
@@ -173,26 +228,34 @@ pub async fn run_cat_task(
             Err(err) => {
                 tracing::warn!(device = %cfg.device, error = %err, "failed to open CAT serial port");
                 state_tx.send_modify(|s| s.connected = false);
-                tokio::time::sleep(RECONNECT_BACKOFF).await;
+                if backoff_or_shutdown(RECONNECT_BACKOFF, &mut tune_rx).await {
+                    return;
+                }
                 continue;
             }
         };
 
-        let mut writer = port;
-        let mut reader = match writer.try_clone() {
+        let writer_box = port;
+        let mut reader = match writer_box.try_clone() {
             Ok(clone) => clone,
             Err(err) => {
                 tracing::warn!(error = %err, "failed to clone CAT serial handle");
                 state_tx.send_modify(|s| s.connected = false);
-                tokio::time::sleep(RECONNECT_BACKOFF).await;
+                if backoff_or_shutdown(RECONNECT_BACKOFF, &mut tune_rx).await {
+                    return;
+                }
                 continue;
             }
         };
 
-        if let Err(err) = writer.write_all(b"AI2;FA;FB;MD;") {
+        let mut writer: Option<Box<dyn serialport::SerialPort>> = Some(writer_box);
+
+        if let Err(err) = write_blocking(&mut writer, b"AI2;FA;FB;MD;".to_vec()).await {
             tracing::warn!(error = %err, "failed to write CAT init command");
             state_tx.send_modify(|s| s.connected = false);
-            tokio::time::sleep(RECONNECT_BACKOFF).await;
+            if backoff_or_shutdown(RECONNECT_BACKOFF, &mut tune_rx).await {
+                return;
+            }
             continue;
         }
 
@@ -208,15 +271,29 @@ pub async fn run_cat_task(
         let (chunk_tx, mut chunk_rx) = mpsc::channel::<std::io::Result<Vec<u8>>>(16);
         let read_task = tokio::task::spawn_blocking(move || {
             let mut buf = [0u8; READ_CHUNK];
+            let mut consecutive_zero_reads = 0u32;
             loop {
                 match reader.read(&mut buf) {
-                    Ok(0) => continue,
+                    Ok(0) => {
+                        consecutive_zero_reads += 1;
+                        if consecutive_zero_reads >= MAX_CONSECUTIVE_ZERO_READS {
+                            let _ = chunk_tx.blocking_send(Err(std::io::Error::new(
+                                std::io::ErrorKind::UnexpectedEof,
+                                "serial port read returned 0 bytes repeatedly (likely hung up)",
+                            )));
+                            return;
+                        }
+                        std::thread::sleep(ZERO_READ_PAUSE);
+                    }
                     Ok(n) => {
+                        consecutive_zero_reads = 0;
                         if chunk_tx.blocking_send(Ok(buf[..n].to_vec())).is_err() {
                             return;
                         }
                     }
-                    Err(err) if err.kind() == std::io::ErrorKind::TimedOut => continue,
+                    Err(err) if err.kind() == std::io::ErrorKind::TimedOut => {
+                        consecutive_zero_reads = 0;
+                    }
                     Err(err) => {
                         let _ = chunk_tx.blocking_send(Err(err));
                         return;
@@ -255,7 +332,7 @@ pub async fn run_cat_task(
                     match tune {
                         Some(freq_hz) => {
                             let cmd = tune_command(freq_hz);
-                            if let Err(err) = writer.write_all(cmd.as_bytes()) {
+                            if let Err(err) = write_blocking(&mut writer, cmd.into_bytes()).await {
                                 break 'session format!("write error: {err}");
                             }
                         }
@@ -268,7 +345,7 @@ pub async fn run_cat_task(
                     }
                 }
                 _ = keepalive.tick() => {
-                    if let Err(err) = writer.write_all(b"FA;") {
+                    if let Err(err) = write_blocking(&mut writer, b"FA;".to_vec()).await {
                         break 'session format!("keepalive write error: {err}");
                     }
                 }
@@ -282,7 +359,9 @@ pub async fn run_cat_task(
 
         tracing::warn!(reason = %disconnect_reason, "CAT serial disconnected");
         state_tx.send_modify(|s| s.connected = false);
-        tokio::time::sleep(RECONNECT_BACKOFF).await;
+        if backoff_or_shutdown(RECONNECT_BACKOFF, &mut tune_rx).await {
+            return;
+        }
     }
 }
 
