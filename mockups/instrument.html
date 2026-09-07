@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>k3fall — Instrument (Rams)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700&family=Spline+Sans+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --shell: oklch(0.9 0.008 85);         /* warm enamel */
+    --panel: oklch(0.955 0.007 85);       /* paper white */
+    --panel-deep: oklch(0.915 0.008 85);
+    --ink: oklch(0.24 0.012 75);
+    --ink-2: oklch(0.46 0.012 75);
+    --ink-3: oklch(0.64 0.012 80);
+    --hairline: oklch(0.82 0.01 85);
+    --orange: oklch(0.62 0.19 40);        /* Braun orange */
+    --green: oklch(0.55 0.11 150);        /* moss power dot */
+    --paper: oklch(0.94 0.012 90);        /* chart paper */
+    --needle: oklch(0.55 0.2 28);
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body {
+    background: oklch(0.85 0.01 85);
+    font-family: "Schibsted Grotesk", sans-serif; color: var(--ink);
+    display: grid; place-items: center; min-height: 100vh; padding: 28px;
+  }
+  .mono { font-family: "Spline Sans Mono", monospace; }
+
+  .unit {
+    width: min(1240px, 100%);
+    background: linear-gradient(180deg, var(--panel), var(--shell));
+    border-radius: 14px;
+    box-shadow: 0 30px 70px oklch(0.3 0.02 80 / 0.35), inset 0 1px 0 oklch(1 0 0 / 0.7);
+    border: 1px solid oklch(0.78 0.01 85);
+    padding: 26px 30px 30px;
+  }
+
+  /* nameplate */
+  .nameplate { display: flex; align-items: baseline; gap: 18px; padding-bottom: 18px;
+               border-bottom: 1px solid var(--hairline); margin-bottom: 22px; }
+  .nameplate .brand { font-weight: 700; font-size: 22px; letter-spacing: -0.3px; }
+  .nameplate .brand::before { content: ""; display: inline-block; width: 11px; height: 11px;
+    border-radius: 50%; background: var(--orange); margin-right: 10px; }
+  .nameplate .type { font-family: "Spline Sans Mono", monospace; font-size: 12px;
+    color: var(--ink-2); letter-spacing: 1.5px; }
+  .nameplate .right { margin-left: auto; display: flex; gap: 24px; align-items: center;
+    font-family: "Spline Sans Mono", monospace; font-size: 11.5px; color: var(--ink-2); }
+  .pwr { display: flex; align-items: center; gap: 7px; }
+  .pwr i { width: 9px; height: 9px; border-radius: 50%; background: var(--green);
+           box-shadow: inset 0 -1px 1px oklch(0.35 0.08 150); }
+
+  .grid { display: grid; grid-template-columns: 296px 1fr; gap: 26px; }
+
+  /* ---- control column ---- */
+  .col { display: flex; flex-direction: column; gap: 20px; }
+  .block { border: 1px solid var(--hairline); border-radius: 10px; padding: 14px 16px 16px;
+           background: var(--panel); }
+  .block h3 { font-size: 11px; font-weight: 600; letter-spacing: 2.5px; color: var(--ink-2);
+              display: flex; gap: 8px; margin-bottom: 12px; }
+  .block h3 .no { color: var(--orange); font-family: "Spline Sans Mono", monospace; }
+
+  /* dial */
+  .dialwrap { display: flex; gap: 16px; align-items: center; }
+  .dial { width: 128px; height: 128px; border-radius: 50%; position: relative; flex: none;
+    background:
+      radial-gradient(circle at 42% 36%, oklch(0.97 0.005 85), oklch(0.86 0.01 85));
+    border: 1px solid var(--hairline);
+    box-shadow: 0 6px 14px oklch(0.3 0.02 80/0.18), inset 0 1px 0 oklch(1 0 0/0.8); }
+  .dial::before { content: ""; position: absolute; inset: 14px; border-radius: 50%;
+    background: repeating-conic-gradient(var(--ink-3) 0deg 1deg, transparent 1deg 15deg); mask: radial-gradient(circle, transparent 58%, #000 60%); }
+  .dial::after { content: ""; position: absolute; left: 50%; top: 12px; width: 4px; height: 26px;
+    background: var(--orange); border-radius: 2px; transform: translateX(-50%); }
+  .dial .hub { position: absolute; inset: 34px; border-radius: 50%;
+    background: radial-gradient(circle at 40% 34%, oklch(0.99 0 0), oklch(0.9 0.008 85));
+    border: 1px solid var(--hairline); }
+  .dialinfo .f { font-family: "Spline Sans Mono", monospace; font-size: 26px; font-weight: 500;
+    letter-spacing: -0.5px; }
+  .dialinfo .f small { color: var(--ink-2); font-weight: 300; }
+  .dialinfo .sub { font-family: "Spline Sans Mono", monospace; font-size: 11.5px; color: var(--ink-2);
+    margin-top: 4px; line-height: 1.7; }
+  .dialinfo .sub b { color: var(--ink); font-weight: 500; }
+
+  /* steppers + toggles */
+  .steprow { display: flex; gap: 8px; margin-top: 12px; }
+  .step { flex: 1; text-align: center; border: 1px solid var(--hairline); border-radius: 7px;
+          padding: 7px 2px; font-size: 12px; background: var(--panel); cursor: pointer; }
+  .step.on { background: var(--ink); color: var(--panel); border-color: var(--ink); }
+  .switches { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 18px; }
+  .sw { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .sw label { font-size: 12.5px; }
+  .toggle { width: 40px; height: 22px; border-radius: 4px; background: var(--panel-deep);
+    border: 1px solid var(--hairline); position: relative; flex: none;
+    box-shadow: inset 0 2px 4px oklch(0.6 0.01 85/0.35); }
+  .toggle i { position: absolute; top: 2px; bottom: 2px; width: 16px; left: 3px; border-radius: 3px;
+    background: linear-gradient(180deg, oklch(0.99 0 0), oklch(0.88 0.008 85));
+    border: 1px solid oklch(0.75 0.01 85); box-shadow: 0 1px 2px oklch(0.4 0.01 85/0.4); }
+  .toggle.on { background: color-mix(in oklab, var(--orange) 24%, var(--panel-deep)); }
+  .toggle.on i { left: auto; right: 3px; }
+
+  /* slider */
+  .slider { margin-top: 4px; }
+  .slider .lbl { display: flex; justify-content: space-between; font-size: 11.5px;
+    color: var(--ink-2); margin-bottom: 6px; }
+  .slider .lbl b { font-family: "Spline Sans Mono", monospace; color: var(--ink); font-weight: 500; }
+  .track { height: 3px; background: var(--hairline); border-radius: 2px; position: relative; }
+  .track i { position: absolute; top: -6px; width: 14px; height: 15px; border-radius: 3px;
+    background: linear-gradient(180deg, oklch(0.99 0 0), oklch(0.88 0.008 85));
+    border: 1px solid oklch(0.72 0.01 85); box-shadow: 0 1px 3px oklch(0.4 0.01 85/0.4); }
+  .track .fill { position: absolute; left: 0; top: 0; bottom: 0; background: var(--orange);
+    border-radius: 2px; }
+
+  /* keyer */
+  .keys { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .key { border: 1px solid var(--hairline); border-radius: 7px; padding: 8px 10px;
+    background: var(--panel); font-size: 12.5px; display: flex; justify-content: space-between; }
+  .key span { color: var(--ink-3); font-family: "Spline Sans Mono", monospace; font-size: 10.5px; }
+  .kyline { margin-top: 10px; font-family: "Spline Sans Mono", monospace; font-size: 13px;
+    border: 1px solid var(--hairline); border-radius: 7px; padding: 9px 12px;
+    background: var(--paper); color: var(--ink); }
+  .kyline b { color: var(--orange); font-weight: 500; }
+
+  /* ---- chart ---- */
+  .chart { border: 1px solid var(--hairline); border-radius: 10px; overflow: hidden;
+    background: var(--paper); display: flex; flex-direction: column; }
+  .chart-head { display: flex; align-items: baseline; gap: 16px; padding: 10px 16px;
+    border-bottom: 1px solid var(--hairline); background: var(--panel); }
+  .chart-head h3 { font-size: 11px; font-weight: 600; letter-spacing: 2.5px; color: var(--ink-2); }
+  .chart-head h3 .no { color: var(--orange); font-family: "Spline Sans Mono", monospace; margin-right: 8px; }
+  .chart-head .meta { margin-left: auto; font-family: "Spline Sans Mono", monospace;
+    font-size: 11px; color: var(--ink-2); }
+  .spotband { position: relative; height: 24px; border-bottom: 1px solid var(--hairline);
+    background: var(--panel); }
+  .an { position: absolute; top: 4px; transform: translateX(-50%);
+    font-family: "Spline Sans Mono", monospace; font-size: 10.5px; color: var(--ink);
+    padding: 0 5px; border-bottom: 2px solid var(--orange); }
+  .an.pota { border-color: var(--green); }
+  .an.dim { color: var(--ink-3); border-color: var(--ink-3); }
+  .an::after { content: ""; position: absolute; left: 50%; top: 100%; width: 1px; height: 4px;
+    background: currentColor; }
+  .scopewrap { position: relative; flex: 1; display: flex; flex-direction: column; min-height: 0; }
+  canvas { display: block; width: 100%; }
+  #spectrum { height: 74px; flex: none; border-bottom: 1px solid var(--hairline); }
+  #falls { flex: 1; min-height: 330px; }
+  .needle { position: absolute; top: 0; bottom: 0; left: 46%; width: 1px; background: var(--needle); }
+  .needle::before { content: "A"; position: absolute; top: 3px; left: 4px;
+    font-family: "Spline Sans Mono", monospace; font-size: 10px; color: var(--needle); }
+  .needle.b { left: 41.2%; opacity: 0.55; }
+  .needle.b::before { content: "B"; }
+  .ruler { display: flex; justify-content: space-between; padding: 4px 12px 6px;
+    border-top: 1px solid var(--hairline); background: var(--panel);
+    font-family: "Spline Sans Mono", monospace; font-size: 10.5px; color: var(--ink-2); }
+  .chart-foot { display: flex; gap: 22px; padding: 8px 16px; background: var(--panel);
+    border-top: 1px solid var(--hairline); font-family: "Spline Sans Mono", monospace;
+    font-size: 11px; color: var(--ink-2); }
+  .chart-foot b { color: var(--ink); font-weight: 500; }
+  .chart-foot .hint { margin-left: auto; color: var(--ink-3); }
+</style>
+</head>
+<body>
+<div class="unit">
+  <header class="nameplate">
+    <span class="brand">k3fall</span>
+    <span class="type">IF SPECTROGRAPH · TYPE K3-R · No. 001</span>
+    <div class="right">
+      <span>CAT 38400 · RTT 11 ms</span>
+      <span>03:41:07 UTC</span>
+      <span class="pwr"><i></i>ON</span>
+    </div>
+  </header>
+
+  <div class="grid">
+    <div class="col">
+      <div class="block">
+        <h3><span class="no">01</span>TUNING</h3>
+        <div class="dialwrap">
+          <div class="dial"><div class="hub"></div></div>
+          <div class="dialinfo">
+            <div class="f">14.032<small>.50</small></div>
+            <div class="sub">
+              B <b>14.028.00</b><br>
+              MODE <b>CW</b> · RIT <b>+120</b><br>
+              STEP <b>10 Hz</b>
+            </div>
+          </div>
+        </div>
+        <div class="steprow">
+          <div class="step">40</div><div class="step">30</div>
+          <div class="step on">20</div><div class="step">17</div><div class="step">15</div>
+        </div>
+      </div>
+
+      <div class="block">
+        <h3><span class="no">02</span>RECEIVER</h3>
+        <div class="switches">
+          <div class="sw"><label>Preamp</label><div class="toggle on"><i></i></div></div>
+          <div class="sw"><label>Atten.</label><div class="toggle"><i></i></div></div>
+          <div class="sw"><label>Blanker</label><div class="toggle"><i></i></div></div>
+          <div class="sw"><label>Split</label><div class="toggle"><i></i></div></div>
+        </div>
+        <div class="slider" style="margin-top:14px">
+          <div class="lbl"><span>BANDWIDTH</span><b>400 Hz</b></div>
+          <div class="track"><div class="fill" style="width:22%"></div><i style="left:22%"></i></div>
+        </div>
+        <div class="slider" style="margin-top:12px">
+          <div class="lbl"><span>OUTPUT</span><b>25 W</b></div>
+          <div class="track"><div class="fill" style="width:25%"></div><i style="left:25%"></i></div>
+        </div>
+      </div>
+
+      <div class="block">
+        <h3><span class="no">03</span>KEYER · 28 WPM</h3>
+        <div class="keys">
+          <div class="key">CQ POTA<span>F1</span></div>
+          <div class="key">5NN CA<span>F2</span></div>
+          <div class="key">TU 73<span>F3</span></div>
+          <div class="key">W6JY<span>F4</span></div>
+        </div>
+        <div class="kyline"><b>TU DE W6JY 5NN</b> CA▍</div>
+      </div>
+    </div>
+
+    <div class="chart">
+      <div class="chart-head">
+        <h3><span class="no">04</span>SPECTROGRAM</h3>
+        <span class="meta">8.215 MHz IF · 250 kHz · 7.6 Hz/BIN · 30 L/s</span>
+      </div>
+      <div class="spotband">
+        <span class="an" style="left:12%">F6HKA</span>
+        <span class="an pota" style="left:29%">K4PDW</span>
+        <span class="an dim" style="left:57%">K3WW</span>
+        <span class="an" style="left:71%">JA1NUT</span>
+        <span class="an" style="left:88%">OM2VL</span>
+      </div>
+      <div class="scopewrap">
+        <canvas id="spectrum"></canvas>
+        <canvas id="falls"></canvas>
+        <div class="needle"></div>
+        <div class="needle b"></div>
+      </div>
+      <div class="ruler">
+        <span>13.985</span><span>14.000</span><span>14.015</span><span>14.030</span>
+        <span>14.045</span><span>14.060</span><span>14.075</span>
+      </div>
+      <div class="chart-foot">
+        <span>FLOOR <b>-121 dBm</b></span>
+        <span>SIG <b>S9+10</b></span>
+        <span>SPOTS <b>RBN 3 · POTA 1 · DX 1</b></span>
+        <span class="hint">click chart to tune</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const carriers = [
+  { x: 0.12, snr: 22, wpm: 26 }, { x: 0.29, snr: 30, wpm: 18 },
+  { x: 0.46, snr: 38, wpm: 28 }, { x: 0.57, snr: 15, wpm: 32 },
+  { x: 0.71, snr: 26, wpm: 22 }, { x: 0.88, snr: 19, wpm: 25 },
+  { x: 0.34, snr: 9, wpm: 20 },  { x: 0.63, snr: 12, wpm: 35 },
+];
+let tick = 0;
+function rowPower(width) {
+  const row = new Float32Array(width);
+  for (let i = 0; i < width; i++) row[i] = Math.random() * 0.13 + 0.03;
+  for (const c of carriers) {
+    const phase = Math.floor(tick * c.wpm / 18);
+    const key = ((Math.sin(phase * 12.9898 + c.x * 78.233) * 43758.5453) % 1 + 1) % 1 > 0.38;
+    if (!key) continue;
+    const px = Math.floor(c.x * width);
+    for (let d = -2; d <= 2; d++) {
+      const v = (c.snr / 40) * Math.exp(-(d * d) / 1.4);
+      if (row[px + d] !== undefined) row[px + d] += v;
+    }
+  }
+  return row;
+}
+// ink on paper: cream -> sepia -> near-black ink (power = darkness)
+function inkmap(v) {
+  v = Math.min(1, v);
+  const paper = [238, 233, 222], mid = [170, 148, 116], ink = [46, 40, 32];
+  if (v < 0.45) {
+    const t = v / 0.45;
+    return paper.map((p, i) => Math.round(p + (mid[i] - p) * t));
+  }
+  const t = (v - 0.45) / 0.55;
+  return mid.map((p, i) => Math.round(p + (ink[i] - p) * t));
+}
+const falls = document.getElementById('falls');
+const spec = document.getElementById('spectrum');
+function sizeCanvas(cv) {
+  const dpr = window.devicePixelRatio || 1;
+  cv.width = cv.clientWidth * dpr; cv.height = cv.clientHeight * dpr;
+}
+sizeCanvas(falls); sizeCanvas(spec);
+const fctx = falls.getContext('2d');
+const sctx = spec.getContext('2d');
+function step() {
+  tick++;
+  const w = falls.width;
+  const row = rowPower(w);
+  fctx.drawImage(falls, 0, 0, w, falls.height - 1, 0, 1, w, falls.height - 1);
+  const img = fctx.createImageData(w, 1);
+  for (let i = 0; i < w; i++) {
+    let [r, g, b] = inkmap(row[i]);
+    // faint chart-paper grid every ~60px
+    if (i % 120 < 1) { r -= 14; g -= 12; b -= 8; }
+    img.data.set([r, g, b, 255], i * 4);
+  }
+  fctx.putImageData(img, 0, 0);
+  sctx.fillStyle = '#eee9de';
+  sctx.fillRect(0, 0, w, spec.height);
+  sctx.strokeStyle = 'rgba(46,40,32,0.25)';
+  sctx.lineWidth = 0.5;
+  for (const fy of [0.33, 0.66]) {
+    sctx.beginPath(); sctx.moveTo(0, spec.height * fy); sctx.lineTo(w, spec.height * fy); sctx.stroke();
+  }
+  sctx.strokeStyle = '#2e2820';
+  sctx.lineWidth = 1;
+  sctx.beginPath();
+  for (let i = 0; i < w; i++) {
+    const y = spec.height - Math.min(1, row[i]) * (spec.height - 6) - 3;
+    i ? sctx.lineTo(i, y) : sctx.moveTo(i, y);
+  }
+  sctx.stroke();
+}
+for (let i = 0; i < falls.height; i++) step();
+if (!matchMedia('(prefers-reduced-motion: reduce)').matches) setInterval(step, 66);
+</script>
+</body>
+</html>

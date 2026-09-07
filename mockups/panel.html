@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>k3fall — Panel (Elecraft)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@400;500;600&family=Share+Tech+Mono&family=Kaushan+Script&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --panel: oklch(0.24 0.006 80);        /* warm charcoal, K3 powder-coat */
+    --panel-hi: oklch(0.28 0.007 80);
+    --panel-lo: oklch(0.19 0.006 80);
+    --legend: oklch(0.87 0.005 90);       /* silkscreen white */
+    --legend-dim: oklch(0.62 0.008 90);
+    --gold: oklch(0.75 0.09 85);          /* secondary function gold */
+    --lcd-bg: oklch(0.32 0.03 120);       /* yellow-green LCD glass */
+    --lcd-bg-deep: oklch(0.27 0.028 120);
+    --lcd-ink: oklch(0.93 0.13 110);      /* lit segments */
+    --lcd-ghost: oklch(0.38 0.03 118);    /* unlit segments */
+    --led-green: oklch(0.8 0.19 145);
+    --led-amber: oklch(0.8 0.15 80);
+    --btn-face: oklch(0.42 0.008 80);
+    --btn-face-hi: oklch(0.47 0.009 80);
+    --btn-tan: oklch(0.62 0.03 80);       /* the olive-tan band buttons */
+    --spot-rbn: oklch(0.72 0.12 250);
+    --spot-pota: oklch(0.75 0.14 150);
+    --spot-cluster: oklch(0.85 0.13 95);
+  }
+  * { box-sizing: border-box; margin: 0; }
+  html, body { height: 100%; }
+  body {
+    background: oklch(0.13 0.004 80);
+    font-family: "Barlow Semi Condensed", sans-serif;
+    color: var(--legend);
+    display: grid; place-items: center;
+    padding: 24px;
+  }
+  .chassis {
+    width: min(1280px, 100%);
+    background:
+      radial-gradient(120% 160% at 30% 0%, var(--panel-hi), var(--panel) 55%, var(--panel-lo));
+    border-radius: 10px;
+    border: 1px solid oklch(0.34 0.006 80);
+    box-shadow: 0 24px 60px oklch(0 0 0 / 0.55), inset 0 1px 0 oklch(0.4 0.006 80 / 0.6);
+    padding: 22px 26px 26px;
+    position: relative;
+  }
+  .screw {
+    position: absolute; width: 13px; height: 13px; border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, oklch(0.55 0.005 80), oklch(0.25 0.005 80));
+    box-shadow: inset 0 0 2px oklch(0 0 0/0.8);
+  }
+  .screw::after {
+    content: ""; position: absolute; left: 1.5px; right: 1.5px; top: 5.5px; height: 1.6px;
+    background: oklch(0.16 0 0); transform: rotate(24deg); border-radius: 1px;
+  }
+  .screw.tl{top:10px;left:10px} .screw.tr{top:10px;right:10px}
+  .screw.bl{bottom:10px;left:10px} .screw.br{bottom:10px;right:10px}
+
+  /* ---- masthead ---- */
+  .masthead { display: flex; align-items: baseline; gap: 14px; margin: 0 6px 16px; }
+  .logo { font-family: "Kaushan Script", cursive; font-size: 27px; color: var(--legend); letter-spacing: 0.5px; }
+  .model { font-size: 15px; font-weight: 600; letter-spacing: 3.5px; color: var(--gold); }
+  .masthead .leds { margin-left: auto; display: flex; gap: 16px; align-items: center; }
+  .led { display: flex; gap: 6px; align-items: center; font-size: 11px; letter-spacing: 1.5px; color: var(--legend-dim); }
+  .led i { width: 7px; height: 7px; border-radius: 50%; background: var(--led-green);
+           box-shadow: 0 0 5px var(--led-green); }
+  .led.warn i { background: var(--led-amber); box-shadow: 0 0 5px var(--led-amber); }
+  .led .val { font-family: "Share Tech Mono", monospace; color: var(--legend); letter-spacing: 0; }
+
+  /* ---- main grid ---- */
+  .deck { display: grid; grid-template-columns: 176px 1fr 196px; gap: 18px; }
+
+  /* ---- LCD ---- */
+  .lcd {
+    background:
+      linear-gradient(178deg, var(--lcd-bg), var(--lcd-bg-deep) 70%);
+    border-radius: 6px;
+    border: 1px solid oklch(0.15 0.01 110);
+    box-shadow: inset 0 3px 14px oklch(0 0 0 / 0.45), inset 0 -1px 0 oklch(0.45 0.03 120/0.5);
+    padding: 12px 18px 10px;
+    font-family: "Share Tech Mono", monospace;
+    color: var(--lcd-ink);
+    display: grid; grid-template-columns: 1fr auto; gap: 2px 24px;
+    margin-bottom: 12px;
+  }
+  .vfoa { font-size: 58px; line-height: 1; letter-spacing: 2px;
+          text-shadow: 0 0 10px oklch(0.93 0.13 110 / 0.35); }
+  .vfoa small { font-size: 30px; }
+  .vfo-tags { display: flex; gap: 14px; font-size: 12px; letter-spacing: 2px; margin-top: 6px; }
+  .vfo-tags .on { color: var(--lcd-ink); }
+  .vfo-tags .off { color: var(--lcd-ghost); }
+  .lcd-right { text-align: right; display: flex; flex-direction: column; justify-content: space-between; }
+  .vfob { font-size: 22px; color: oklch(0.85 0.1 110); }
+  .vfob span.tag { font-size: 11px; letter-spacing: 2px; color: var(--lcd-ghost); margin-right: 6px; }
+  .smeter { grid-column: 1 / -1; display: flex; align-items: baseline; gap: 8px; margin-top: 4px; }
+  .smeter .scale { font-size: 10px; letter-spacing: 0; color: var(--lcd-ghost); }
+  .bars { display: flex; gap: 2.5px; align-items: flex-end; height: 14px; flex: 1; }
+  .bars i { flex: 1; background: var(--lcd-ghost); height: 100%; border-radius: 1px; }
+  .bars i.lit { background: var(--lcd-ink); box-shadow: 0 0 4px oklch(0.93 0.13 110/0.4); }
+  .smeter .rd { font-size: 13px; }
+
+  /* ---- waterfall (P3) ---- */
+  .p3 {
+    background: oklch(0.11 0.01 250);
+    border-radius: 6px;
+    border: 1px solid oklch(0.15 0.005 80);
+    box-shadow: inset 0 3px 12px oklch(0 0 0/0.5);
+    overflow: hidden;
+    position: relative;
+  }
+  .spotstrip { position: relative; height: 20px; background: oklch(0.14 0.008 250);
+               border-bottom: 1px solid oklch(0.2 0.01 250); font-family: "Share Tech Mono", monospace; }
+  .spot { position: absolute; top: 3px; font-size: 10.5px; letter-spacing: 0.5px; transform: translateX(-50%);
+          padding: 0 4px; border-radius: 2px; color: oklch(0.14 0.01 250); font-weight: 600; }
+  .spot::after { content: ""; position: absolute; left: 50%; top: 100%; width: 1px; height: 5px; background: currentColor; }
+  .spot.rbn { background: var(--spot-rbn); color: oklch(0.16 0.02 250); }
+  .spot.pota { background: var(--spot-pota); color: oklch(0.16 0.03 150); }
+  .spot.cluster { background: var(--spot-cluster); color: oklch(0.2 0.04 95); }
+  .spot.dupe { opacity: 0.45; }
+  canvas { display: block; width: 100%; }
+  #spectrum { height: 64px; }
+  #falls { height: 258px; }
+  .freqscale { display: flex; justify-content: space-between; padding: 3px 10px;
+               font-family: "Share Tech Mono", monospace; font-size: 10.5px;
+               color: oklch(0.6 0.02 250); background: oklch(0.14 0.008 250);
+               border-top: 1px solid oklch(0.2 0.01 250); }
+  .cursor { position: absolute; top: 20px; bottom: 18px; width: 1px;
+            background: var(--led-green); left: 46%; box-shadow: 0 0 6px var(--led-green); }
+  .cursor::before { content: "14.032.50"; position: absolute; top: 2px; left: 4px;
+            font-family: "Share Tech Mono", monospace; font-size: 10px; color: var(--led-green); }
+
+  /* ---- buttons ---- */
+  .stack { display: flex; flex-direction: column; gap: 14px; }
+  .cluster { display: grid; gap: 8px; }
+  .cluster h4 { font-size: 10px; font-weight: 600; letter-spacing: 3px; color: var(--legend-dim);
+                text-align: center; margin-bottom: 2px; }
+  .row2 { grid-template-columns: 1fr 1fr; }
+  .row3 { grid-template-columns: 1fr 1fr 1fr; }
+  button.k {
+    font-family: inherit; font-size: 12px; font-weight: 600; letter-spacing: 1px;
+    color: var(--legend); cursor: pointer;
+    background: linear-gradient(180deg, var(--btn-face-hi), var(--btn-face));
+    border: 1px solid oklch(0.2 0.005 80);
+    border-radius: 5px; padding: 8px 4px 6px;
+    box-shadow: 0 2px 0 oklch(0.14 0.005 80), inset 0 1px 0 oklch(0.55 0.01 80/0.5);
+    display: flex; flex-direction: column; align-items: center; gap: 1px;
+  }
+  button.k:active { transform: translateY(1px); box-shadow: 0 1px 0 oklch(0.14 0.005 80); }
+  button.k .sub { font-size: 9px; font-weight: 500; letter-spacing: 1px; color: var(--gold); }
+  button.k.tan { background: linear-gradient(180deg, oklch(0.66 0.032 80), var(--btn-tan));
+                 color: oklch(0.2 0.01 80); }
+  button.k.tan .sub { color: oklch(0.34 0.05 60); }
+  button.k.lit { outline: 1px solid var(--led-green); }
+  button.k.lit::after { content: ""; width: 4px; height: 4px; border-radius: 50%;
+                        background: var(--led-green); box-shadow: 0 0 4px var(--led-green);
+                        position: absolute; margin-top: -6px; margin-left: 52px; }
+
+  /* ---- knobs ---- */
+  .knobrow { display: flex; justify-content: space-around; align-items: flex-end; }
+  .knob { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  .knob .cap {
+    border-radius: 50%;
+    background:
+      repeating-conic-gradient(oklch(0.32 0.005 80) 0deg 4deg, oklch(0.22 0.005 80) 4deg 8deg);
+    border: 3px solid oklch(0.17 0.005 80);
+    box-shadow: 0 5px 12px oklch(0 0 0/0.5), inset 0 2px 6px oklch(0.5 0.005 80/0.35);
+    position: relative;
+  }
+  .knob .cap::before { content: ""; position: absolute; inset: 18%; border-radius: 50%;
+    background: radial-gradient(circle at 38% 32%, oklch(0.36 0.006 80), oklch(0.2 0.005 80)); }
+  .knob .cap::after { content: ""; position: absolute; left: 50%; top: 7%; width: 3px; height: 20%;
+    background: var(--legend); border-radius: 2px; transform: translateX(-50%); }
+  .knob.big .cap { width: 118px; height: 118px; }
+  .knob.small .cap { width: 56px; height: 56px; }
+  .knob label { font-size: 10px; letter-spacing: 2.5px; color: var(--legend-dim); font-weight: 600; }
+  .knob .readout { font-family: "Share Tech Mono", monospace; font-size: 11px; color: var(--gold); }
+
+  /* ---- keyer bar ---- */
+  .keyer { margin-top: 16px; display: flex; gap: 10px; align-items: stretch; }
+  .keyer .macros { display: flex; gap: 8px; }
+  .keyer input {
+    flex: 1; font-family: "Share Tech Mono", monospace; font-size: 14px;
+    background: var(--lcd-bg-deep); color: var(--lcd-ink);
+    border: 1px solid oklch(0.15 0.01 110); border-radius: 5px; padding: 8px 12px;
+    box-shadow: inset 0 2px 8px oklch(0 0 0/0.4);
+  }
+  .keyer input::placeholder { color: var(--lcd-ghost); }
+  .fkey { min-width: 86px; position: relative; }
+</style>
+</head>
+<body>
+<div class="chassis">
+  <div class="screw tl"></div><div class="screw tr"></div>
+  <div class="screw bl"></div><div class="screw br"></div>
+
+  <header class="masthead">
+    <span class="logo">Elecraft</span>
+    <span class="model">K3 · REMOTE</span>
+    <div class="leds">
+      <span class="led"><i></i>CAT <span class="val">38400</span></span>
+      <span class="led"><i></i>SDR <span class="val">250k</span></span>
+      <span class="led warn"><i></i>RTT <span class="val">12 ms</span></span>
+    </div>
+  </header>
+
+  <div class="deck">
+    <!-- left: band & mode -->
+    <div class="stack">
+      <div class="cluster row2">
+        <h4 style="grid-column:1/-1">BAND</h4>
+        <button class="k tan">▲<span class="sub">17 m</span></button>
+        <button class="k tan">▼<span class="sub">30 m</span></button>
+        <button class="k tan lit">20 m<span class="sub">14 MHz</span></button>
+        <button class="k tan">40 m<span class="sub">7 MHz</span></button>
+        <button class="k tan">15 m<span class="sub">21 MHz</span></button>
+        <button class="k tan">10 m<span class="sub">28 MHz</span></button>
+      </div>
+      <div class="cluster row2">
+        <h4 style="grid-column:1/-1">MODE</h4>
+        <button class="k lit">CW<span class="sub">CW-R</span></button>
+        <button class="k">USB<span class="sub">LSB</span></button>
+        <button class="k">DATA<span class="sub">A-D</span></button>
+        <button class="k">AM<span class="sub">FM</span></button>
+      </div>
+      <div class="cluster row2">
+        <h4 style="grid-column:1/-1">RX</h4>
+        <button class="k lit">PRE<span class="sub">ATT</span></button>
+        <button class="k">NB<span class="sub">LVL</span></button>
+        <button class="k">NR<span class="sub">ADJ</span></button>
+        <button class="k">NTCH<span class="sub">MAN</span></button>
+      </div>
+    </div>
+
+    <!-- center: LCD + P3 -->
+    <div>
+      <div class="lcd">
+        <div>
+          <div class="vfoa">14.032<small>.50</small></div>
+          <div class="vfo-tags">
+            <span class="on">CW</span><span class="on">VFO A</span>
+            <span class="off">SPLIT</span><span class="on">RIT +0.12</span>
+            <span class="off">XIT</span><span class="on">FL2 400</span>
+            <span class="off">ATU</span><span class="on">28 WPM</span>
+          </div>
+        </div>
+        <div class="lcd-right">
+          <div class="vfob"><span class="tag">B</span>14.028.00</div>
+          <div class="vfob" style="font-size:13px"><span class="tag">PWR</span>25 W</div>
+        </div>
+        <div class="smeter">
+          <span class="scale">S1</span>
+          <div class="bars" id="sbars"></div>
+          <span class="scale">+40</span>
+          <span class="rd">S9+10</span>
+        </div>
+      </div>
+
+      <div class="p3">
+        <div class="spotstrip">
+          <span class="spot rbn" style="left:12%">F6HKA</span>
+          <span class="spot pota" style="left:29%">K4PDW</span>
+          <span class="spot rbn dupe" style="left:57%">K3WW</span>
+          <span class="spot cluster" style="left:71%">JA1NUT</span>
+          <span class="spot rbn" style="left:88%">OM2VL</span>
+        </div>
+        <canvas id="spectrum"></canvas>
+        <canvas id="falls"></canvas>
+        <div class="cursor"></div>
+        <div class="freqscale">
+          <span>13.985</span><span>14.000</span><span>14.015</span>
+          <span>14.030</span><span>14.045</span><span>14.060</span><span>14.075</span>
+        </div>
+      </div>
+
+      <div class="keyer">
+        <div class="macros">
+          <button class="k fkey">F1<span class="sub">CQ POTA</span></button>
+          <button class="k fkey">F2<span class="sub">EXCH</span></button>
+          <button class="k fkey">F3<span class="sub">TU 73</span></button>
+          <button class="k fkey">F4<span class="sub">W6JY</span></button>
+        </div>
+        <input placeholder="KY — type to send CW…" value="TU DE W6JY 5NN CA">
+      </div>
+    </div>
+
+    <!-- right: knobs & filter -->
+    <div class="stack" style="justify-content: space-between">
+      <div class="cluster row3">
+        <h4 style="grid-column:1/-1">VFO</h4>
+        <button class="k">A/B<span class="sub">REV</span></button>
+        <button class="k">A▶B<span class="sub">B▶A</span></button>
+        <button class="k">SPLIT<span class="sub">SPOT</span></button>
+        <button class="k">RIT<span class="sub">CLR</span></button>
+        <button class="k">XIT<span class="sub">CLR</span></button>
+        <button class="k">LOCK<span class="sub">FINE</span></button>
+      </div>
+      <div class="knob big">
+        <div class="cap"></div>
+        <label>VFO A</label>
+      </div>
+      <div class="knobrow">
+        <div class="knob small"><div class="cap"></div><label>WIDTH</label><span class="readout">400 Hz</span></div>
+        <div class="knob small"><div class="cap"></div><label>WPM</label><span class="readout">28</span></div>
+      </div>
+      <div class="knobrow">
+        <div class="knob small"><div class="cap"></div><label>AF</label></div>
+        <div class="knob small"><div class="cap"></div><label>RF</label></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// S-meter fill
+const sbars = document.getElementById('sbars');
+for (let i = 0; i < 28; i++) {
+  const bar = document.createElement('i');
+  if (i < 19) bar.className = 'lit';
+  sbars.appendChild(bar);
+}
+
+// ---- synthetic band: noise + keyed CW carriers ----
+const carriers = [
+  { x: 0.12, snr: 22, wpm: 26 }, { x: 0.29, snr: 30, wpm: 18 },
+  { x: 0.46, snr: 38, wpm: 28 }, { x: 0.57, snr: 15, wpm: 32 },
+  { x: 0.71, snr: 26, wpm: 22 }, { x: 0.88, snr: 19, wpm: 25 },
+  { x: 0.34, snr: 9, wpm: 20 },  { x: 0.63, snr: 12, wpm: 35 },
+];
+let tick = 0;
+function rowPower(width) {
+  const row = new Float32Array(width);
+  for (let i = 0; i < width; i++) row[i] = Math.random() * 0.16 + 0.05;
+  for (const c of carriers) {
+    // crude morse keying: pseudo-random on/off gated by wpm-scaled clock
+    const phase = Math.floor(tick * c.wpm / 18);
+    const key = ((Math.sin(phase * 12.9898 + c.x * 78.233) * 43758.5453) % 1 + 1) % 1 > 0.38;
+    if (!key) continue;
+    const px = Math.floor(c.x * width);
+    for (let d = -2; d <= 2; d++) {
+      const v = (c.snr / 40) * Math.exp(-(d * d) / 1.4);
+      if (row[px + d] !== undefined) row[px + d] += v;
+    }
+  }
+  return row;
+}
+// P3 palette: black -> deep blue -> cyan -> white
+function p3color(v) {
+  v = Math.min(1, v);
+  if (v < 0.35) { const t = v / 0.35; return [8 + 20 * t, 12 + 45 * t, 40 + 110 * t]; }
+  if (v < 0.7)  { const t = (v - 0.35) / 0.35; return [28 + 60 * t, 57 + 150 * t, 150 + 90 * t]; }
+  const t = (v - 0.7) / 0.3; return [88 + 167 * t, 207 + 48 * t, 240 + 15 * t];
+}
+const falls = document.getElementById('falls');
+const spec = document.getElementById('spectrum');
+function sizeCanvas(cv) {
+  const dpr = window.devicePixelRatio || 1;
+  cv.width = cv.clientWidth * dpr; cv.height = cv.clientHeight * dpr;
+}
+sizeCanvas(falls); sizeCanvas(spec);
+const fctx = falls.getContext('2d');
+const sctx = spec.getContext('2d');
+function step() {
+  tick++;
+  const w = falls.width;
+  const row = rowPower(w);
+  // scroll waterfall down by 1
+  fctx.drawImage(falls, 0, 0, w, falls.height - 1, 0, 1, w, falls.height - 1);
+  const img = fctx.createImageData(w, 1);
+  for (let i = 0; i < w; i++) {
+    const [r, g, b] = p3color(row[i]);
+    img.data.set([r, g, b, 255], i * 4);
+  }
+  fctx.putImageData(img, 0, 0);
+  // spectrum line
+  sctx.fillStyle = 'oklch(0.11 0.01 250)';
+  sctx.fillRect(0, 0, w, spec.height);
+  sctx.strokeStyle = 'oklch(0.85 0.09 110)';
+  sctx.lineWidth = 1;
+  sctx.beginPath();
+  for (let i = 0; i < w; i++) {
+    const y = spec.height - Math.min(1, row[i]) * (spec.height - 4) - 2;
+    i ? sctx.lineTo(i, y) : sctx.moveTo(i, y);
+  }
+  sctx.stroke();
+}
+for (let i = 0; i < falls.height; i++) step(); // pre-fill
+const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+if (!reduced) setInterval(step, 66);
+</script>
+</body>
+</html>

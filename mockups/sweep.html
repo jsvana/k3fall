@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>k3fall — Sweep (Carrier Wave native)</title>
+<style>
+  :root {
+    --bg: #ececf1;             /* systemGroupedBackground */
+    --window: #f7f7fa;
+    --card: #ffffff;
+    --gray5: #e5e5ea;
+    --gray6: #f2f2f7;
+    --label: #1c1c1e;
+    --secondary: #6e6e73;
+    --tertiary: #aeaeb2;
+    --blue: #007aff;
+    --green: #34c759;
+    --red: #ff3b30;
+    --orange: #ff9500;
+    --purple: #af52de;
+    --yellow: #f5c500;
+    --teal: #30b0c7;
+    --indigo: #5856d6;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body {
+    background: #d8d8e0;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+    color: var(--label);
+    display: grid; place-items: center; min-height: 100vh; padding: 24px;
+    font-size: 13px;
+  }
+  .mono { font-family: ui-monospace, "SF Mono", Menlo, monospace; }
+
+  .window {
+    width: min(1240px, 100%);
+    background: var(--window);
+    border-radius: 12px;
+    box-shadow: 0 22px 70px rgba(0,0,0,0.28), 0 0 0 0.5px rgba(0,0,0,0.15);
+    overflow: hidden;
+    display: grid;
+    grid-template-rows: 44px 1fr 26px;
+    grid-template-columns: 196px 1fr;
+  }
+  /* title bar */
+  .titlebar {
+    grid-column: 1 / -1;
+    display: flex; align-items: center; gap: 8px; padding: 0 14px;
+    background: linear-gradient(#fbfbfd, #f1f1f5);
+    border-bottom: 1px solid #dcdce2;
+  }
+  .lights { display: flex; gap: 7px; margin-right: 10px; }
+  .lights i { width: 12px; height: 12px; border-radius: 50%; }
+  .lights i:nth-child(1){background:#ff5f57}.lights i:nth-child(2){background:#febc2e}
+  .lights i:nth-child(3){background:#28c840}
+  .titlebar .title { font-weight: 600; font-size: 13px; color: var(--secondary); }
+  .toolbar { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+  .tbtn { border: 1px solid #d6d6dd; background: #fff; border-radius: 6px;
+          padding: 3px 10px; font-size: 12px; color: var(--label); }
+  .radio-chip { display: flex; align-items: center; gap: 6px; font-size: 12px;
+                background: #fff; border: 1px solid #d6d6dd; border-radius: 6px; padding: 3px 10px; }
+  .radio-chip i { width: 7px; height: 7px; border-radius: 50%; background: var(--green); }
+
+  /* sidebar */
+  .sidebar { background: var(--gray6); border-right: 1px solid #e0e0e6; padding: 10px 8px; }
+  .sec { font-size: 11px; font-weight: 600; color: var(--tertiary); padding: 10px 10px 4px;
+         letter-spacing: 0.3px; }
+  .item { display: flex; align-items: center; gap: 8px; padding: 5px 10px; border-radius: 6px;
+          color: var(--label); font-size: 13px; }
+  .item .ico { width: 17px; text-align: center; color: var(--blue); font-size: 13px; }
+  .item.sel { background: rgba(0,122,255,0.14); }
+  .item .cnt { margin-left: auto; font-size: 11px; color: var(--tertiary); }
+
+  /* content */
+  .content { padding: 14px 16px; overflow: auto; display: flex; flex-direction: column; gap: 14px;
+             background: var(--bg); }
+  .card { background: var(--card); border-radius: 12px; padding: 12px 14px;
+          box-shadow: 0 0 0 0.5px rgba(0,0,0,0.06); }
+  .card h2 { font-size: 13px; font-weight: 600; margin-bottom: 10px; display: flex; align-items: center; }
+  .card h2 .aux { margin-left: auto; font-size: 11px; font-weight: 400; color: var(--secondary); }
+
+  .toprow { display: grid; grid-template-columns: 1.2fr 1fr; gap: 14px; }
+
+  /* radio card */
+  .freqrow { display: flex; align-items: baseline; gap: 16px; }
+  .vfoa { font-size: 34px; font-weight: 600; letter-spacing: 0.5px; }
+  .vfoa small { font-size: 20px; color: var(--secondary); font-weight: 500; }
+  .vfob { font-size: 15px; color: var(--secondary); }
+  .badges { display: flex; gap: 6px; margin: 10px 0 12px; flex-wrap: wrap; }
+  .cap { font-size: 11px; font-weight: 500; padding: 2px 8px; border-radius: 99px;
+         background: rgba(0,122,255,0.16); color: #0a63c9; }
+  .cap.grey { background: var(--gray5); color: var(--secondary); }
+  .cap.purple { background: rgba(175,82,222,0.16); color: #8b3fc2; }
+  .ctlgrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .ctl { text-align: center; background: var(--gray6); border-radius: 8px; padding: 7px 4px 6px; }
+  .ctl .v { font-weight: 600; font-size: 14px; }
+  .ctl .l { font-size: 10.5px; color: var(--secondary); margin-top: 1px; }
+  .ctl.on { background: rgba(0,122,255,0.12); }
+  .ctl.on .v { color: var(--blue); }
+
+  /* keyer card */
+  .macros { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; }
+  .macro { display: flex; justify-content: space-between; align-items: center;
+           background: var(--gray6); border-radius: 8px; padding: 8px 10px; font-size: 12.5px; }
+  .macro b { font-weight: 600; }
+  .macro span { font-size: 10.5px; color: var(--tertiary); }
+  .kyfield { display: flex; gap: 8px; }
+  .kyfield input { flex: 1; border: none; background: var(--gray6); border-radius: 8px;
+                   padding: 9px 12px; font-size: 13px;
+                   font-family: ui-monospace, "SF Mono", Menlo, monospace; color: var(--label); }
+  .send { background: var(--green); color: #fff; font-weight: 600; border: none;
+          border-radius: 8px; padding: 0 18px; font-size: 13px; }
+
+  /* waterfall card */
+  .wf { border-radius: 8px; overflow: hidden; background: #0a0e18; position: relative; }
+  .spotstrip { position: relative; height: 22px; background: #10141f; }
+  .spot { position: absolute; top: 3px; transform: translateX(-50%);
+          font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 10.5px; font-weight: 600;
+          padding: 1px 6px; border-radius: 99px; color: #fff; }
+  .spot.rbn { background: var(--blue); } .spot.pota { background: var(--green); }
+  .spot.cluster { background: var(--yellow); color: #4d3d00; }
+  .spot.dupe { opacity: 0.4; }
+  canvas { display: block; width: 100%; }
+  #spectrum { height: 56px; }
+  #falls { height: 220px; }
+  .vfoline { position: absolute; top: 22px; bottom: 20px; left: 46%; width: 1.5px;
+             background: var(--green); }
+  .fscale { display: flex; justify-content: space-between; padding: 3px 10px; background: #10141f;
+            font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 10px; color: #7c8698; }
+  .wfaux { display: flex; gap: 10px; align-items: center; margin-top: 8px; font-size: 11.5px;
+           color: var(--secondary); }
+  .wfaux .zoom { margin-left: auto; display: flex; gap: 4px; }
+  .zbtn { border: 1px solid #d6d6dd; background: #fff; border-radius: 5px; width: 22px; height: 20px;
+          font-size: 12px; color: var(--label); line-height: 1; }
+
+  /* spots table */
+  table { border-collapse: collapse; width: 100%; }
+  th { text-align: left; font-size: 10.5px; font-weight: 600; color: var(--tertiary);
+       padding: 0 8px 6px 0; }
+  td { padding: 5px 8px 5px 0; font-size: 12.5px; border-top: 1px solid #f0f0f4; }
+  td.call { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-weight: 600; }
+  .srcdot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 6px; }
+  .tagnew { font-size: 10px; font-weight: 700; background: var(--red); color: #fff;
+            padding: 1px 5px; border-radius: 3px; }
+  .tagband { font-size: 10px; font-weight: 700; background: var(--orange); color: #fff;
+             padding: 1px 5px; border-radius: 3px; }
+  .tagb4 { font-size: 10px; font-weight: 600; background: var(--gray5); color: var(--secondary);
+           padding: 1px 5px; border-radius: 3px; }
+  .agedot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 5px; }
+  .tune { color: var(--blue); font-weight: 500; font-size: 12px; }
+
+  /* status bar */
+  .statusbar { grid-column: 1 / -1; display: flex; align-items: center; gap: 18px;
+               padding: 0 14px; background: var(--gray6); border-top: 1px solid #e0e0e6;
+               font-size: 11px; color: var(--secondary); }
+  .statusbar .right { margin-left: auto; display: flex; gap: 18px; }
+  .statusbar i { width: 6px; height: 6px; border-radius: 50%; background: var(--green);
+                 display: inline-block; margin-right: 5px; }
+</style>
+</head>
+<body>
+<div class="window">
+  <div class="titlebar">
+    <div class="lights"><i></i><i></i><i></i></div>
+    <span class="title">k3fall — Shack</span>
+    <div class="toolbar">
+      <span class="radio-chip"><i></i>K3 · usbserial-1420 · 38400</span>
+      <button class="tbtn">Layout ▾</button>
+      <button class="tbtn">⌘K</button>
+    </div>
+  </div>
+
+  <nav class="sidebar">
+    <div class="sec">RADIO</div>
+    <div class="item sel"><span class="ico">〰</span>Waterfall</div>
+    <div class="item"><span class="ico">◉</span>Controls</div>
+    <div class="item"><span class="ico">⌸</span>Memories<span class="cnt">8</span></div>
+    <div class="sec">SPOTS</div>
+    <div class="item"><span class="ico">📡</span>All Spots<span class="cnt">142</span></div>
+    <div class="item"><span class="ico">🍃</span>POTA<span class="cnt">23</span></div>
+    <div class="sec">LOGGING</div>
+    <div class="item"><span class="ico">✎</span>Session</div>
+    <div class="item"><span class="ico">≣</span>Log<span class="cnt">31,204</span></div>
+    <div class="sec">CW</div>
+    <div class="item"><span class="ico">⌘</span>Macros</div>
+  </nav>
+
+  <main class="content">
+    <div class="toprow">
+      <div class="card">
+        <h2>K3 <span class="aux">VFO A</span></h2>
+        <div class="freqrow mono">
+          <span class="vfoa">14.032<small>.50</small></span>
+          <span class="vfob">B 14.028.00</span>
+        </div>
+        <div class="badges">
+          <span class="cap">CW</span><span class="cap">20m</span>
+          <span class="cap">FL2 · 400 Hz</span><span class="cap grey">RIT +120</span>
+          <span class="cap grey">25 W</span><span class="cap purple">28 WPM</span>
+        </div>
+        <div class="ctlgrid">
+          <div class="ctl on"><div class="v">PRE</div><div class="l">preamp</div></div>
+          <div class="ctl"><div class="v">ATT</div><div class="l">–10 dB</div></div>
+          <div class="ctl"><div class="v">NB</div><div class="l">blanker</div></div>
+          <div class="ctl"><div class="v">SPLIT</div><div class="l">off</div></div>
+          <div class="ctl"><div class="v">A/B</div><div class="l">swap</div></div>
+          <div class="ctl"><div class="v">A→B</div><div class="l">copy</div></div>
+          <div class="ctl on"><div class="v">S9+10</div><div class="l">signal</div></div>
+          <div class="ctl"><div class="v">ATU</div><div class="l">tune</div></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>CW Keyer <span class="aux">via CAT · KY</span></h2>
+        <div class="macros">
+          <div class="macro"><b>CQ POTA</b><span>F1</span></div>
+          <div class="macro"><b>5NN CA</b><span>F2</span></div>
+          <div class="macro"><b>TU 73</b><span>F3</span></div>
+          <div class="macro"><b>W6JY</b><span>F4</span></div>
+        </div>
+        <div class="kyfield">
+          <input value="TU DE W6JY 5NN CA" spellcheck="false">
+          <button class="send">Send</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Waterfall <span class="aux">8.215 MHz IF · 250 kHz span · 7.6 Hz/bin · 30 fps</span></h2>
+      <div class="wf">
+        <div class="spotstrip">
+          <span class="spot rbn" style="left:12%">F6HKA</span>
+          <span class="spot pota" style="left:29%">K4PDW</span>
+          <span class="spot rbn dupe" style="left:57%">K3WW</span>
+          <span class="spot cluster" style="left:71%">JA1NUT</span>
+          <span class="spot rbn" style="left:88%">OM2VL</span>
+        </div>
+        <canvas id="spectrum"></canvas>
+        <canvas id="falls"></canvas>
+        <div class="vfoline"></div>
+        <div class="fscale">
+          <span>13.985</span><span>14.000</span><span>14.015</span><span>14.030</span>
+          <span>14.045</span><span>14.060</span><span>14.075</span>
+        </div>
+      </div>
+      <div class="wfaux">
+        <span>Click to tune · ⌥-click sets VFO B</span>
+        <div class="zoom">
+          <button class="zbtn">−</button><button class="zbtn">＋</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Spots — 20m CW <span class="aux">RBN · POTA · Cluster · 5 of 142</span></h2>
+      <table>
+        <tr><th>SOURCE</th><th>CALLSIGN</th><th>FREQ</th><th>SNR</th><th>AGE</th><th>STATUS</th><th></th></tr>
+        <tr>
+          <td><span class="srcdot" style="background:var(--blue)"></span>RBN</td>
+          <td class="call">F6HKA</td><td class="mono">14.008.1</td><td>22 dB</td>
+          <td><span class="agedot" style="background:var(--yellow)"></span>0:41</td>
+          <td><span class="tagnew">NEW DXCC</span></td><td class="tune">Tune ›</td>
+        </tr>
+        <tr>
+          <td><span class="srcdot" style="background:var(--green)"></span>POTA</td>
+          <td class="call">K4PDW</td><td class="mono">14.031.0</td><td>—</td>
+          <td><span class="agedot" style="background:var(--yellow)"></span>1:12</td>
+          <td><span class="tagband">US-2169</span></td><td class="tune">Tune ›</td>
+        </tr>
+        <tr>
+          <td><span class="srcdot" style="background:var(--yellow)"></span>Cluster</td>
+          <td class="call">JA1NUT</td><td class="mono">14.052.3</td><td>—</td>
+          <td><span class="agedot" style="background:var(--orange)"></span>2:05</td>
+          <td></td><td class="tune">Tune ›</td>
+        </tr>
+        <tr>
+          <td><span class="srcdot" style="background:var(--blue)"></span>RBN</td>
+          <td class="call">K3WW</td><td class="mono">14.040.4</td><td>38 dB</td>
+          <td><span class="agedot" style="background:#c7c7cc"></span>3:58</td>
+          <td><span class="tagb4">WORKED B4</span></td><td class="tune">Tune ›</td>
+        </tr>
+        <tr>
+          <td><span class="srcdot" style="background:var(--blue)"></span>RBN</td>
+          <td class="call">OM2VL</td><td class="mono">14.066.9</td><td>19 dB</td>
+          <td><span class="agedot" style="background:#c7c7cc"></span>4:31</td>
+          <td></td><td class="tune">Tune ›</td>
+        </tr>
+      </table>
+    </div>
+  </main>
+
+  <footer class="statusbar">
+    <span><i></i>K3 connected</span>
+    <span>IQ 250 kS/s</span>
+    <span>Session: POTA hunt · 0:47</span>
+    <div class="right">
+      <span>14 QSOs today</span>
+      <span class="mono">03:41:07 UTC</span>
+    </div>
+  </footer>
+</div>
+
+<script>
+const carriers = [
+  { x: 0.12, snr: 22, wpm: 26 }, { x: 0.29, snr: 30, wpm: 18 },
+  { x: 0.46, snr: 38, wpm: 28 }, { x: 0.57, snr: 15, wpm: 32 },
+  { x: 0.71, snr: 26, wpm: 22 }, { x: 0.88, snr: 19, wpm: 25 },
+  { x: 0.34, snr: 9, wpm: 20 },  { x: 0.63, snr: 12, wpm: 35 },
+];
+let tick = 0;
+function rowPower(width) {
+  const row = new Float32Array(width);
+  for (let i = 0; i < width; i++) row[i] = Math.random() * 0.15 + 0.04;
+  for (const c of carriers) {
+    const phase = Math.floor(tick * c.wpm / 18);
+    const key = ((Math.sin(phase * 12.9898 + c.x * 78.233) * 43758.5453) % 1 + 1) % 1 > 0.38;
+    if (!key) continue;
+    const px = Math.floor(c.x * width);
+    for (let d = -2; d <= 2; d++) {
+      const v = (c.snr / 40) * Math.exp(-(d * d) / 1.4);
+      if (row[px + d] !== undefined) row[px + d] += v;
+    }
+  }
+  return row;
+}
+// classic blue -> cyan -> yellow -> white
+function cmap(v) {
+  v = Math.min(1, v);
+  if (v < 0.35) { const t = v / 0.35; return [10 + 10 * t, 14 + 40 * t, 24 + 120 * t]; }
+  if (v < 0.65) { const t = (v - 0.35) / 0.3; return [20 + 40 * t, 54 + 130 * t, 144 + 60 * t]; }
+  if (v < 0.85) { const t = (v - 0.65) / 0.2; return [60 + 180 * t, 184 + 50 * t, 204 - 100 * t]; }
+  const t = (v - 0.85) / 0.15; return [240 + 15 * t, 234 + 21 * t, 104 + 150 * t];
+}
+const falls = document.getElementById('falls');
+const spec = document.getElementById('spectrum');
+function sizeCanvas(cv) {
+  const dpr = window.devicePixelRatio || 1;
+  cv.width = cv.clientWidth * dpr; cv.height = cv.clientHeight * dpr;
+}
+sizeCanvas(falls); sizeCanvas(spec);
+const fctx = falls.getContext('2d');
+const sctx = spec.getContext('2d');
+function step() {
+  tick++;
+  const w = falls.width;
+  const row = rowPower(w);
+  fctx.drawImage(falls, 0, 0, w, falls.height - 1, 0, 1, w, falls.height - 1);
+  const img = fctx.createImageData(w, 1);
+  for (let i = 0; i < w; i++) img.data.set([...cmap(row[i]), 255], i * 4);
+  fctx.putImageData(img, 0, 0);
+  sctx.fillStyle = '#0a0e18';
+  sctx.fillRect(0, 0, w, spec.height);
+  sctx.strokeStyle = '#8fd0ff';
+  sctx.lineWidth = 1;
+  sctx.beginPath();
+  for (let i = 0; i < w; i++) {
+    const y = spec.height - Math.min(1, row[i]) * (spec.height - 5) - 2;
+    i ? sctx.lineTo(i, y) : sctx.moveTo(i, y);
+  }
+  sctx.stroke();
+}
+for (let i = 0; i < falls.height; i++) step();
+if (!matchMedia('(prefers-reduced-motion: reduce)').matches) setInterval(step, 66);
+</script>
+</body>
+</html>
