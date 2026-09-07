@@ -3,325 +3,437 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>k3fall — Panel (Elecraft)</title>
+<title>k3fall — Panel (Elecraft K3)</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@400;500;600&family=Share+Tech+Mono&family=Kaushan+Script&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@400;500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
 <style>
+  @font-face {
+    font-family: "DSEG7";
+    src: url("https://cdn.jsdelivr.net/npm/dseg@0.46.0/fonts/DSEG7-Classic/DSEG7Classic-Bold.woff2") format("woff2");
+    font-display: swap;
+  }
   :root {
-    --panel: oklch(0.24 0.006 80);        /* warm charcoal, K3 powder-coat */
-    --panel-hi: oklch(0.28 0.007 80);
-    --panel-lo: oklch(0.19 0.006 80);
-    --legend: oklch(0.87 0.005 90);       /* silkscreen white */
-    --legend-dim: oklch(0.62 0.008 90);
-    --gold: oklch(0.75 0.09 85);          /* secondary function gold */
-    --lcd-bg: oklch(0.32 0.03 120);       /* yellow-green LCD glass */
-    --lcd-bg-deep: oklch(0.27 0.028 120);
-    --lcd-ink: oklch(0.93 0.13 110);      /* lit segments */
-    --lcd-ghost: oklch(0.38 0.03 118);    /* unlit segments */
-    --led-green: oklch(0.8 0.19 145);
-    --led-amber: oklch(0.8 0.15 80);
-    --btn-face: oklch(0.42 0.008 80);
-    --btn-face-hi: oklch(0.47 0.009 80);
-    --btn-tan: oklch(0.62 0.03 80);       /* the olive-tan band buttons */
-    --spot-rbn: oklch(0.72 0.12 250);
-    --spot-pota: oklch(0.75 0.14 150);
-    --spot-cluster: oklch(0.85 0.13 95);
+    --chassis: #1b1b1e;
+    --chassis-hi: #26262a;
+    --panel-text: #e8e8ea;          /* white silkscreen */
+    --gold: #d0a02e;                /* secondary function labels */
+    --red: #e0442e;                 /* keypad digits */
+    --btn-blk-hi: #404046; --btn-blk: #26262b;
+    --btn-slv-hi: #dcdcde; --btn-slv: #a2a2a8;
+    --lcd-hi: #f8b64c;              /* amber backlight center */
+    --lcd-lo: #e2932a;              /* amber edges */
+    --seg: #402c06;                 /* dark segments */
+    --seg-ghost: rgba(80, 56, 12, 0.13);
+    --led-green: #46d95a;
+    --spot-rbn: #7aa7e8; --spot-pota: #7ed491; --spot-cluster: #e8d06a;
   }
   * { box-sizing: border-box; margin: 0; }
-  html, body { height: 100%; }
   body {
-    background: oklch(0.13 0.004 80);
-    font-family: "Barlow Semi Condensed", sans-serif;
-    color: var(--legend);
-    display: grid; place-items: center;
-    padding: 24px;
+    background: #0d0d0f;
+    font-family: "Barlow Semi Condensed", "Arial Narrow", sans-serif;
+    color: var(--panel-text);
+    display: grid; place-items: center; min-height: 100vh; padding: 26px;
   }
+  .stack-units { width: min(1240px, 100%); display: flex; flex-direction: column; gap: 14px; }
+
+  /* ============ chassis ============ */
   .chassis {
-    width: min(1280px, 100%);
-    background:
-      radial-gradient(120% 160% at 30% 0%, var(--panel-hi), var(--panel) 55%, var(--panel-lo));
-    border-radius: 10px;
-    border: 1px solid oklch(0.34 0.006 80);
-    box-shadow: 0 24px 60px oklch(0 0 0 / 0.55), inset 0 1px 0 oklch(0.4 0.006 80 / 0.6);
-    padding: 22px 26px 26px;
+    background: linear-gradient(180deg, var(--chassis-hi), var(--chassis) 12%, #17171a);
+    border-radius: 6px;
+    border: 1px solid #000;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.7), inset 0 1px 0 rgba(255,255,255,0.07),
+                inset 3px 0 6px rgba(255,255,255,0.03), inset -3px 0 6px rgba(0,0,0,0.5);
+    padding: 16px 20px 20px;
     position: relative;
   }
-  .screw {
-    position: absolute; width: 13px; height: 13px; border-radius: 50%;
-    background: radial-gradient(circle at 35% 30%, oklch(0.55 0.005 80), oklch(0.25 0.005 80));
-    box-shadow: inset 0 0 2px oklch(0 0 0/0.8);
+  /* angled side rails like the K3 extrusion */
+  .chassis::before, .chassis::after {
+    content: ""; position: absolute; top: 0; bottom: 0; width: 9px;
+    background: linear-gradient(90deg, #303034, #1a1a1d);
   }
-  .screw::after {
-    content: ""; position: absolute; left: 1.5px; right: 1.5px; top: 5.5px; height: 1.6px;
-    background: oklch(0.16 0 0); transform: rotate(24deg); border-radius: 1px;
+  .chassis::before { left: 0; border-radius: 6px 0 0 6px; }
+  .chassis::after { right: 0; transform: scaleX(-1); border-radius: 6px 0 0 6px; }
+
+  /* ============ nameplate ============ */
+  .nameplate {
+    display: flex; align-items: center; gap: 14px; justify-content: center;
+    margin: 2px 0 10px;
   }
-  .screw.tl{top:10px;left:10px} .screw.tr{top:10px;right:10px}
-  .screw.bl{bottom:10px;left:10px} .screw.br{bottom:10px;right:10px}
+  .nameplate .rule { flex: 1; max-width: 220px; height: 3px;
+    border-top: 1px solid #55555c; border-bottom: 1px solid #55555c; }
+  .nameplate .word {
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: 15px; letter-spacing: 5px; color: #cfcfd4; white-space: nowrap;
+  }
+  .nameplate .hex { color: var(--gold); font-size: 13px; margin-right: 2px; }
+  .nameplate .leds { position: absolute; right: 26px; top: 18px; display: flex; gap: 12px; }
+  .lnk { display: flex; align-items: center; gap: 5px; font-size: 10px; letter-spacing: 1px;
+         color: #8a8a90; }
+  .lnk i { width: 6px; height: 6px; border-radius: 50%; background: var(--led-green);
+           box-shadow: 0 0 4px var(--led-green); }
+  .lnk b { font-family: "Share Tech Mono", monospace; font-weight: 400; color: #bcbcc2; }
 
-  /* ---- masthead ---- */
-  .masthead { display: flex; align-items: baseline; gap: 14px; margin: 0 6px 16px; }
-  .logo { font-family: "Kaushan Script", cursive; font-size: 27px; color: var(--legend); letter-spacing: 0.5px; }
-  .model { font-size: 15px; font-weight: 600; letter-spacing: 3.5px; color: var(--gold); }
-  .masthead .leds { margin-left: auto; display: flex; gap: 16px; align-items: center; }
-  .led { display: flex; gap: 6px; align-items: center; font-size: 11px; letter-spacing: 1.5px; color: var(--legend-dim); }
-  .led i { width: 7px; height: 7px; border-radius: 50%; background: var(--led-green);
-           box-shadow: 0 0 5px var(--led-green); }
-  .led.warn i { background: var(--led-amber); box-shadow: 0 0 5px var(--led-amber); }
-  .led .val { font-family: "Share Tech Mono", monospace; color: var(--legend); letter-spacing: 0; }
+  .deck { display: grid; grid-template-columns: 168px 1fr 388px; gap: 16px; align-items: start; }
 
-  /* ---- main grid ---- */
-  .deck { display: grid; grid-template-columns: 176px 1fr 196px; gap: 18px; }
+  /* ============ buttons ============ */
+  .btn {
+    font-family: inherit; font-weight: 600; font-size: 10px; letter-spacing: 0.4px;
+    color: #f2f2f4; cursor: pointer; line-height: 1.05;
+    background: linear-gradient(180deg, var(--btn-blk-hi), var(--btn-blk));
+    border: 1px solid #0a0a0c; border-radius: 4px;
+    min-height: 24px; padding: 3px 2px;
+    box-shadow: 0 1.5px 0 #0a0a0c, inset 0 1px 0 rgba(255,255,255,0.14);
+    position: relative; text-align: center;
+  }
+  .btn:active { transform: translateY(1px); box-shadow: 0 0.5px 0 #0a0a0c; }
+  .btn.slv { background: linear-gradient(180deg, var(--btn-slv-hi), var(--btn-slv));
+             color: #1c1c1e; box-shadow: 0 1.5px 0 #55555a, inset 0 1px 0 rgba(255,255,255,0.7); }
+  .btn .d { position: absolute; right: 2px; bottom: 1px; font-size: 8px; color: var(--red);
+            font-weight: 700; }
+  .btn.slv .d { color: #b3311f; }
+  .btn.lit::after { content: ""; position: absolute; left: 3px; top: 3px; width: 4px; height: 4px;
+    border-radius: 50%; background: var(--led-green); box-shadow: 0 0 4px var(--led-green); }
 
-  /* ---- LCD ---- */
+  .fnrow { display: grid; gap: 4px 6px; }
+  .fnrow .lbl { font-size: 8.5px; font-weight: 600; letter-spacing: 0.5px; color: var(--gold);
+                text-align: center; margin-top: -1px; }
+  .bracket { font-size: 8.5px; font-weight: 600; letter-spacing: 2px; color: var(--panel-text);
+             text-align: center; position: relative; margin: 1px 6px 0; }
+  .bracket::before, .bracket::after { content: ""; position: absolute; top: 45%; width: 26%;
+             border-top: 1px solid #6a6a70; border-left: 1px solid #6a6a70; height: 4px; }
+  .bracket::before { left: 0; } .bracket::after { right: 0; border-left: none;
+             border-right: 1px solid #6a6a70; }
+
+  /* ============ left cluster ============ */
+  .left { display: flex; flex-direction: column; gap: 9px; }
+  .g3 { grid-template-columns: 1fr 1fr 1fr; }
+  .rocker { display: flex; }
+  .rocker .btn { flex: 1; border-radius: 4px 0 0 4px; }
+  .rocker .btn + .btn { border-radius: 0 4px 4px 0; border-left: none; }
+  .txrow { display: flex; align-items: center; gap: 7px; font-size: 9px; letter-spacing: 1px;
+           color: #9a9aa0; margin: 2px 0; }
+  .txrow .r { width: 7px; height: 7px; border-radius: 50%; background: #58201a;
+              border: 1px solid #000; }
+  .txrow .y { width: 7px; height: 7px; border-radius: 50%; background: #5a4c16;
+              border: 1px solid #000; }
+  .knob { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .kcap { border-radius: 50%; position: relative;
+    background: radial-gradient(circle at 38% 32%, #3c3c42, #141416 70%);
+    border: 1px solid #000;
+    box-shadow: 0 3px 8px rgba(0,0,0,0.6), inset 0 1px 1px rgba(255,255,255,0.12); }
+  .kcap::after { content: ""; position: absolute; left: 50%; top: 8%; width: 2.5px; height: 22%;
+    background: #d8d8da; border-radius: 2px; transform: translateX(-50%); }
+  .kcap.sm { width: 44px; height: 44px; }
+  .knob .kl { font-size: 9px; font-weight: 600; letter-spacing: 1px; color: var(--panel-text); }
+  .knob .kl em { font-style: normal; color: var(--gold); }
+  .knob .kv { font-family: "Share Tech Mono", monospace; font-size: 9.5px; color: #8a8a90; }
+  .knobpair { display: flex; justify-content: space-around; }
+
+  /* ============ LCD ============ */
+  .lcdwrap { display: flex; flex-direction: column; gap: 12px; }
   .lcd {
+    border-radius: 4px; border: 2px solid #0a0a0c;
     background:
-      linear-gradient(178deg, var(--lcd-bg), var(--lcd-bg-deep) 70%);
-    border-radius: 6px;
-    border: 1px solid oklch(0.15 0.01 110);
-    box-shadow: inset 0 3px 14px oklch(0 0 0 / 0.45), inset 0 -1px 0 oklch(0.45 0.03 120/0.5);
-    padding: 12px 18px 10px;
-    font-family: "Share Tech Mono", monospace;
-    color: var(--lcd-ink);
-    display: grid; grid-template-columns: 1fr auto; gap: 2px 24px;
-    margin-bottom: 12px;
+      radial-gradient(140% 120% at 50% 40%, var(--lcd-hi), var(--lcd-lo) 85%, #c97f22);
+    box-shadow: inset 0 2px 10px rgba(60, 30, 0, 0.45), 0 0 0 1px #333;
+    padding: 10px 16px 8px;
+    display: grid; grid-template-columns: 200px 1fr; gap: 4px 18px;
+    color: var(--seg);
   }
-  .vfoa { font-size: 58px; line-height: 1; letter-spacing: 2px;
-          text-shadow: 0 0 10px oklch(0.93 0.13 110 / 0.35); }
-  .vfoa small { font-size: 30px; }
-  .vfo-tags { display: flex; gap: 14px; font-size: 12px; letter-spacing: 2px; margin-top: 6px; }
-  .vfo-tags .on { color: var(--lcd-ink); }
-  .vfo-tags .off { color: var(--lcd-ghost); }
-  .lcd-right { text-align: right; display: flex; flex-direction: column; justify-content: space-between; }
-  .vfob { font-size: 22px; color: oklch(0.85 0.1 110); }
-  .vfob span.tag { font-size: 11px; letter-spacing: 2px; color: var(--lcd-ghost); margin-right: 6px; }
-  .smeter { grid-column: 1 / -1; display: flex; align-items: baseline; gap: 8px; margin-top: 4px; }
-  .smeter .scale { font-size: 10px; letter-spacing: 0; color: var(--lcd-ghost); }
-  .bars { display: flex; gap: 2.5px; align-items: flex-end; height: 14px; flex: 1; }
-  .bars i { flex: 1; background: var(--lcd-ghost); height: 100%; border-radius: 1px; }
-  .bars i.lit { background: var(--lcd-ink); box-shadow: 0 0 4px oklch(0.93 0.13 110/0.4); }
-  .smeter .rd { font-size: 13px; }
+  .meterblk { font-family: "Share Tech Mono", monospace; font-size: 8.5px;
+              display: flex; flex-direction: column; justify-content: center; gap: 2px; }
+  .mscale { display: flex; justify-content: space-between; padding: 0 1px; font-weight: 600; }
+  .mbars { display: flex; gap: 2px; }
+  .mbars i { width: 8px; height: 9px; background: var(--seg-ghost); }
+  .mbars i.on { background: var(--seg); }
+  .annun { font-family: "Share Tech Mono", monospace; font-size: 9px; letter-spacing: 0.5px;
+           margin-top: 5px; line-height: 1.75; font-weight: 600; }
+  .annun .off { color: var(--seg-ghost); }
+  .freqblk { text-align: right; position: relative; }
+  .seg7 { font-family: "DSEG7", "Share Tech Mono", monospace; }
+  .vfoa { font-size: 44px; line-height: 1.05; }
+  .vfoa .ghost { color: var(--seg-ghost); }
+  .vfob { font-size: 20px; margin-top: 3px; }
+  .fmark { position: absolute; right: -4px; font-family: "Share Tech Mono", monospace;
+           font-size: 9px; font-weight: 700; }
+  .fmark.a { top: 6px; } .fmark.b { bottom: 4px; }
+  .fmark .box { border: 1.5px solid var(--seg); padding: 0 2px; margin-left: 3px; }
+  .statline { grid-column: 1 / -1; display: flex; justify-content: space-between;
+              font-family: "Share Tech Mono", monospace; font-size: 9.5px; font-weight: 600;
+              border-top: 1px solid rgba(64, 44, 6, 0.25); padding-top: 3px; margin-top: 2px; }
+  .statline .off { color: var(--seg-ghost); }
 
-  /* ---- waterfall (P3) ---- */
-  .p3 {
-    background: oklch(0.11 0.01 250);
-    border-radius: 6px;
-    border: 1px solid oklch(0.15 0.005 80);
-    box-shadow: inset 0 3px 12px oklch(0 0 0/0.5);
-    overflow: hidden;
-    position: relative;
+  /* ============ center knob row ============ */
+  .centerrow { display: grid; grid-template-columns: auto auto 1fr auto auto; gap: 14px;
+               align-items: center; }
+  .minicol { display: flex; flex-direction: column; gap: 10px; }
+  .vfoknob { width: 128px; height: 128px; border-radius: 50%; position: relative; margin: 0 auto;
+    background: radial-gradient(circle at 40% 34%, #46464c, #101012 72%);
+    border: 2px solid #000;
+    box-shadow: 0 6px 16px rgba(0,0,0,0.7), inset 0 2px 2px rgba(255,255,255,0.1); }
+  .vfoknob .dimple { position: absolute; left: 22%; top: 26%; width: 20px; height: 20px;
+    border-radius: 50%; background: radial-gradient(circle at 40% 35%, #08080a, #2e2e33);
+    box-shadow: inset 0 1px 3px #000; }
+  .vfoknob .ring { position: absolute; inset: 8px; border-radius: 50%;
+    border: 1px solid rgba(255,255,255,0.06); }
+  .tinycol { display: flex; flex-direction: column; gap: 5px; width: 52px; }
+  .tinycol .btn { min-height: 20px; font-size: 9px; }
+  .tinycol .lbl { font-size: 8px; color: var(--gold); text-align: center; font-weight: 600;
+                  margin-top: -2px; }
+  .vfob-knob { width: 74px; height: 74px; }
+
+  /* ============ right cluster ============ */
+  .right { display: grid; grid-template-columns: 1fr 1fr 1fr 118px; gap: 6px 8px;
+           align-items: start; }
+  .fcol { display: flex; flex-direction: column; gap: 4px; }
+  .fcol .lbl { font-size: 8.5px; color: var(--gold); text-align: center; font-weight: 600; }
+  .msgblk { display: flex; flex-direction: column; gap: 5px; align-items: center;
+            grid-row: 1 / span 4; grid-column: 4; }
+  .msgrow { display: flex; gap: 5px; width: 100%; }
+  .msgrow .btn { flex: 1; }
+  .reccluster { display: grid; grid-template-columns: 30px 34px 30px; grid-template-rows: 26px 26px;
+                gap: 4px; align-items: center; justify-items: stretch; }
+  .btn.round { border-radius: 50%; min-height: 30px; }
+
+  /* ============ P3 unit ============ */
+  .p3unit { padding-bottom: 14px; }
+  .p3screen {
+    border: 2px solid #0a0a0c; border-radius: 4px; background: #05070d;
+    box-shadow: inset 0 2px 12px rgba(0,0,0,0.7), 0 0 0 1px #333;
+    overflow: hidden; position: relative; margin-bottom: 10px;
   }
-  .spotstrip { position: relative; height: 20px; background: oklch(0.14 0.008 250);
-               border-bottom: 1px solid oklch(0.2 0.01 250); font-family: "Share Tech Mono", monospace; }
-  .spot { position: absolute; top: 3px; font-size: 10.5px; letter-spacing: 0.5px; transform: translateX(-50%);
-          padding: 0 4px; border-radius: 2px; color: oklch(0.14 0.01 250); font-weight: 600; }
-  .spot::after { content: ""; position: absolute; left: 50%; top: 100%; width: 1px; height: 5px; background: currentColor; }
-  .spot.rbn { background: var(--spot-rbn); color: oklch(0.16 0.02 250); }
-  .spot.pota { background: var(--spot-pota); color: oklch(0.16 0.03 150); }
-  .spot.cluster { background: var(--spot-cluster); color: oklch(0.2 0.04 95); }
-  .spot.dupe { opacity: 0.45; }
+  .p3top { display: flex; justify-content: space-between; padding: 3px 10px;
+           font-family: "Share Tech Mono", monospace; font-size: 10px; color: #c8d2e0;
+           background: #0a0e16; }
+  .spotstrip { position: relative; height: 18px; background: #0a0e16; }
+  .spot { position: absolute; top: 1px; transform: translateX(-50%);
+          font-family: "Share Tech Mono", monospace; font-size: 10px; font-weight: 600;
+          padding: 0 4px; border-radius: 2px; color: #0a0e16; }
+  .spot.rbn { background: var(--spot-rbn); } .spot.pota { background: var(--spot-pota); }
+  .spot.cluster { background: var(--spot-cluster); } .spot.dupe { opacity: 0.45; }
+  .spot::after { content: ""; position: absolute; left: 50%; top: 100%; width: 1px; height: 4px;
+                 background: currentColor; }
   canvas { display: block; width: 100%; }
-  #spectrum { height: 64px; }
-  #falls { height: 258px; }
-  .freqscale { display: flex; justify-content: space-between; padding: 3px 10px;
-               font-family: "Share Tech Mono", monospace; font-size: 10.5px;
-               color: oklch(0.6 0.02 250); background: oklch(0.14 0.008 250);
-               border-top: 1px solid oklch(0.2 0.01 250); }
-  .cursor { position: absolute; top: 20px; bottom: 18px; width: 1px;
-            background: var(--led-green); left: 46%; box-shadow: 0 0 6px var(--led-green); }
-  .cursor::before { content: "14.032.50"; position: absolute; top: 2px; left: 4px;
-            font-family: "Share Tech Mono", monospace; font-size: 10px; color: var(--led-green); }
-
-  /* ---- buttons ---- */
-  .stack { display: flex; flex-direction: column; gap: 14px; }
-  .cluster { display: grid; gap: 8px; }
-  .cluster h4 { font-size: 10px; font-weight: 600; letter-spacing: 3px; color: var(--legend-dim);
-                text-align: center; margin-bottom: 2px; }
-  .row2 { grid-template-columns: 1fr 1fr; }
-  .row3 { grid-template-columns: 1fr 1fr 1fr; }
-  button.k {
-    font-family: inherit; font-size: 12px; font-weight: 600; letter-spacing: 1px;
-    color: var(--legend); cursor: pointer;
-    background: linear-gradient(180deg, var(--btn-face-hi), var(--btn-face));
-    border: 1px solid oklch(0.2 0.005 80);
-    border-radius: 5px; padding: 8px 4px 6px;
-    box-shadow: 0 2px 0 oklch(0.14 0.005 80), inset 0 1px 0 oklch(0.55 0.01 80/0.5);
-    display: flex; flex-direction: column; align-items: center; gap: 1px;
-  }
-  button.k:active { transform: translateY(1px); box-shadow: 0 1px 0 oklch(0.14 0.005 80); }
-  button.k .sub { font-size: 9px; font-weight: 500; letter-spacing: 1px; color: var(--gold); }
-  button.k.tan { background: linear-gradient(180deg, oklch(0.66 0.032 80), var(--btn-tan));
-                 color: oklch(0.2 0.01 80); }
-  button.k.tan .sub { color: oklch(0.34 0.05 60); }
-  button.k.lit { outline: 1px solid var(--led-green); }
-  button.k.lit::after { content: ""; width: 4px; height: 4px; border-radius: 50%;
-                        background: var(--led-green); box-shadow: 0 0 4px var(--led-green);
-                        position: absolute; margin-top: -6px; margin-left: 52px; }
-
-  /* ---- knobs ---- */
-  .knobrow { display: flex; justify-content: space-around; align-items: flex-end; }
-  .knob { display: flex; flex-direction: column; align-items: center; gap: 6px; }
-  .knob .cap {
-    border-radius: 50%;
-    background:
-      repeating-conic-gradient(oklch(0.32 0.005 80) 0deg 4deg, oklch(0.22 0.005 80) 4deg 8deg);
-    border: 3px solid oklch(0.17 0.005 80);
-    box-shadow: 0 5px 12px oklch(0 0 0/0.5), inset 0 2px 6px oklch(0.5 0.005 80/0.35);
-    position: relative;
-  }
-  .knob .cap::before { content: ""; position: absolute; inset: 18%; border-radius: 50%;
-    background: radial-gradient(circle at 38% 32%, oklch(0.36 0.006 80), oklch(0.2 0.005 80)); }
-  .knob .cap::after { content: ""; position: absolute; left: 50%; top: 7%; width: 3px; height: 20%;
-    background: var(--legend); border-radius: 2px; transform: translateX(-50%); }
-  .knob.big .cap { width: 118px; height: 118px; }
-  .knob.small .cap { width: 56px; height: 56px; }
-  .knob label { font-size: 10px; letter-spacing: 2.5px; color: var(--legend-dim); font-weight: 600; }
-  .knob .readout { font-family: "Share Tech Mono", monospace; font-size: 11px; color: var(--gold); }
-
-  /* ---- keyer bar ---- */
-  .keyer { margin-top: 16px; display: flex; gap: 10px; align-items: stretch; }
-  .keyer .macros { display: flex; gap: 8px; }
-  .keyer input {
-    flex: 1; font-family: "Share Tech Mono", monospace; font-size: 14px;
-    background: var(--lcd-bg-deep); color: var(--lcd-ink);
-    border: 1px solid oklch(0.15 0.01 110); border-radius: 5px; padding: 8px 12px;
-    box-shadow: inset 0 2px 8px oklch(0 0 0/0.4);
-  }
-  .keyer input::placeholder { color: var(--lcd-ghost); }
-  .fkey { min-width: 86px; position: relative; }
+  #spectrum { height: 62px; }
+  #falls { height: 230px; }
+  .cursor { position: absolute; top: 40px; bottom: 34px; width: 1px; left: 46%;
+            background: var(--led-green); box-shadow: 0 0 5px var(--led-green); }
+  .freqscale { display: flex; justify-content: space-between; padding: 2px 10px 3px;
+               font-family: "Share Tech Mono", monospace; font-size: 10px; color: #7c8698;
+               background: #0a0e16; }
+  .kyline { display: flex; gap: 8px; align-items: center; padding: 4px 10px;
+            background: #0a0e16; border-top: 1px solid #1a2030;
+            font-family: "Share Tech Mono", monospace; font-size: 11px; color: #d8b04c; }
+  .kyline .tag { color: #7c8698; font-size: 9.5px; }
+  .kyline input { flex: 1; background: transparent; border: none; outline: none;
+                  font: inherit; color: #f0c86a; letter-spacing: 1px; }
+  .p3ctl { display: flex; gap: 8px; align-items: center; }
+  .p3ctl .btn { width: 64px; }
+  .p3ctl .fl { font-size: 8px; color: var(--gold); text-align: center; margin-top: 1px;
+               font-weight: 600; }
+  .p3ctl .spacer { flex: 1; }
+  .p3name { display: flex; align-items: center; gap: 10px; }
+  .p3name .word { font-family: Georgia, serif; font-size: 12px; letter-spacing: 4px;
+                  color: #cfcfd4; }
+  .p3name .hex { color: var(--gold); font-size: 11px; }
 </style>
 </head>
 <body>
-<div class="chassis">
-  <div class="screw tl"></div><div class="screw tr"></div>
-  <div class="screw bl"></div><div class="screw br"></div>
+<div class="stack-units">
 
-  <header class="masthead">
-    <span class="logo">Elecraft</span>
-    <span class="model">K3 · REMOTE</span>
-    <div class="leds">
-      <span class="led"><i></i>CAT <span class="val">38400</span></span>
-      <span class="led"><i></i>SDR <span class="val">250k</span></span>
-      <span class="led warn"><i></i>RTT <span class="val">12 ms</span></span>
-    </div>
-  </header>
-
-  <div class="deck">
-    <!-- left: band & mode -->
-    <div class="stack">
-      <div class="cluster row2">
-        <h4 style="grid-column:1/-1">BAND</h4>
-        <button class="k tan">▲<span class="sub">17 m</span></button>
-        <button class="k tan">▼<span class="sub">30 m</span></button>
-        <button class="k tan lit">20 m<span class="sub">14 MHz</span></button>
-        <button class="k tan">40 m<span class="sub">7 MHz</span></button>
-        <button class="k tan">15 m<span class="sub">21 MHz</span></button>
-        <button class="k tan">10 m<span class="sub">28 MHz</span></button>
-      </div>
-      <div class="cluster row2">
-        <h4 style="grid-column:1/-1">MODE</h4>
-        <button class="k lit">CW<span class="sub">CW-R</span></button>
-        <button class="k">USB<span class="sub">LSB</span></button>
-        <button class="k">DATA<span class="sub">A-D</span></button>
-        <button class="k">AM<span class="sub">FM</span></button>
-      </div>
-      <div class="cluster row2">
-        <h4 style="grid-column:1/-1">RX</h4>
-        <button class="k lit">PRE<span class="sub">ATT</span></button>
-        <button class="k">NB<span class="sub">LVL</span></button>
-        <button class="k">NR<span class="sub">ADJ</span></button>
-        <button class="k">NTCH<span class="sub">MAN</span></button>
+  <!-- ================= K3 ================= -->
+  <div class="chassis">
+    <div class="nameplate">
+      <div class="rule"></div>
+      <span class="word"><span class="hex">⬡</span> ELECRAFT&nbsp;&nbsp;K3&nbsp;&nbsp;REMOTE</span>
+      <div class="rule"></div>
+      <div class="leds">
+        <span class="lnk"><i></i>CAT <b>38400</b></span>
+        <span class="lnk"><i></i>IQ <b>250k</b></span>
+        <span class="lnk"><i></i>RTT <b>11ms</b></span>
       </div>
     </div>
 
-    <!-- center: LCD + P3 -->
-    <div>
-      <div class="lcd">
-        <div>
-          <div class="vfoa">14.032<small>.50</small></div>
-          <div class="vfo-tags">
-            <span class="on">CW</span><span class="on">VFO A</span>
-            <span class="off">SPLIT</span><span class="on">RIT +0.12</span>
-            <span class="off">XIT</span><span class="on">FL2 400</span>
-            <span class="off">ATU</span><span class="on">28 WPM</span>
+    <div class="deck">
+      <!-- left cluster -->
+      <div class="left">
+        <div class="fnrow g3">
+          <div class="rocker" style="grid-column:1/3">
+            <button class="btn slv">∨ BAND</button><button class="btn slv">∧</button>
+          </div>
+          <button class="btn slv">MENU</button>
+          <span class="lbl" style="grid-column:1/3">VOX&nbsp;&nbsp;&nbsp;QSK</span>
+          <span class="lbl">CONFIG</span>
+        </div>
+        <div class="fnrow g3">
+          <div class="rocker" style="grid-column:1/3">
+            <button class="btn slv">∨ MODE</button><button class="btn slv">∧</button>
+          </div>
+          <button class="btn slv">DISP</button>
+          <span class="lbl" style="grid-column:1/3">ALT&nbsp;&nbsp;&nbsp;TEST</span>
+          <span class="lbl">METER</span>
+        </div>
+        <div class="fnrow g3">
+          <button class="btn slv" style="grid-column:1/3">POWER</button>
+          <button class="btn">ATU<br>TUNE</button>
+          <span class="lbl" style="grid-column:1/3">&nbsp;</span>
+          <span class="lbl">ATU</span>
+        </div>
+        <div class="txrow">TX <span class="r"></span> — <span class="y"></span> Δf</div>
+        <div class="knobpair">
+          <div class="knob"><div class="kcap sm"></div><span class="kl">AF <em>— SUB</em></span></div>
+          <div class="knob"><div class="kcap sm"></div><span class="kl">RF/SQL <em>— SUB</em></span></div>
+        </div>
+        <div class="knobpair">
+          <div class="knob"><div class="kcap sm"></div><span class="kl">SPEED <em>MIC</em></span><span class="kv">28 WPM</span></div>
+          <div class="knob"><div class="kcap sm"></div><span class="kl">CMP <em>PWR</em></span><span class="kv">25 W</span></div>
+        </div>
+      </div>
+
+      <!-- center: LCD + VFO -->
+      <div class="lcdwrap">
+        <div class="lcd">
+          <div class="meterblk">
+            <div class="mscale"><span>S1</span><span>3</span><span>5</span><span>7</span><span>9</span><span>+20</span><span>+40</span><span>+60</span></div>
+            <div class="mbars" id="sbars"></div>
+            <div class="mscale"><span>SWR</span><span>2</span><span>3</span><span>RF</span><span>5</span><span>10</span></div>
+            <div class="annun">
+              VOX QSK ANT1<br>
+              AGC-S&nbsp;&nbsp;PRE&nbsp;&nbsp;<span class="off">ATT</span><br>
+              RIT▲+0.12&nbsp;&nbsp;<span class="off">SPLT&nbsp;TX</span><br>
+              FL2 400&nbsp;&nbsp;XFIL
+            </div>
+          </div>
+          <div class="freqblk">
+            <span class="fmark a">CW<span class="box">A</span></span>
+            <div class="vfoa seg7">14.032.50</div>
+            <div class="vfob seg7">14.028.00</div>
+            <span class="fmark b"><span class="box">B</span></span>
+          </div>
+          <div class="statline">
+            <span>M1 CQ POTA&nbsp;&nbsp;M2 EXCH&nbsp;&nbsp;M3 TU&nbsp;&nbsp;M4 CALL</span>
+            <span>28 WPM&nbsp;&nbsp;<span class="off">DECODE</span>&nbsp;&nbsp;PWR 25W</span>
           </div>
         </div>
-        <div class="lcd-right">
-          <div class="vfob"><span class="tag">B</span>14.028.00</div>
-          <div class="vfob" style="font-size:13px"><span class="tag">PWR</span>25 W</div>
-        </div>
-        <div class="smeter">
-          <span class="scale">S1</span>
-          <div class="bars" id="sbars"></div>
-          <span class="scale">+40</span>
-          <span class="rd">S9+10</span>
+
+        <div class="centerrow">
+          <div class="minicol">
+            <div class="knob"><div class="kcap sm"></div><span class="kl">SHIFT <em>LO·CUT·HI</em></span></div>
+            <div class="knob"><div class="kcap sm"></div><span class="kl">WIDTH <em>I/II</em></span><span class="kv">400 Hz</span></div>
+          </div>
+          <div class="tinycol">
+            <button class="btn">FREQ ENT</button><span class="lbl">SCAN</span>
+            <button class="btn lit">FINE</button><span class="lbl">COARSE</span>
+            <button class="btn">RATE</button>
+            <button class="btn">LOCK</button>
+          </div>
+          <div>
+            <div class="vfoknob"><div class="ring"></div><div class="dimple"></div></div>
+            <div class="bracket" style="margin-top:6px">VFO A</div>
+          </div>
+          <div class="tinycol">
+            <button class="btn">SUB</button><span class="lbl">DIV</span>
+            <button class="btn">B SET</button>
+          </div>
+          <div class="minicol" style="align-items:center">
+            <div class="knob"><div class="kcap vfob-knob kcap sm" style="width:74px;height:74px"></div><span class="kl">VFO B</span></div>
+            <div class="knob"><div class="kcap sm" style="width:36px;height:36px"></div><span class="kl">OFS</span></div>
+          </div>
         </div>
       </div>
 
-      <div class="p3">
-        <div class="spotstrip">
-          <span class="spot rbn" style="left:12%">F6HKA</span>
-          <span class="spot pota" style="left:29%">K4PDW</span>
-          <span class="spot rbn dupe" style="left:57%">K3WW</span>
-          <span class="spot cluster" style="left:71%">JA1NUT</span>
-          <span class="spot rbn" style="left:88%">OM2VL</span>
+      <!-- right cluster -->
+      <div class="right">
+        <div class="fcol"><button class="btn">A / B<span class="d">1</span></button><span class="lbl">B SET</span></div>
+        <div class="fcol"><button class="btn">REV<span class="d">2</span></button><span class="lbl">VFO</span></div>
+        <div class="fcol"><button class="btn">A ▶ B<span class="d">3</span></button><span class="lbl">SPLIT</span></div>
+        <div class="msgblk">
+          <div class="msgrow">
+            <div class="fcol" style="flex:1"><button class="btn slv">V ▶ M</button><span class="lbl">AF REC</span></div>
+            <div class="fcol" style="flex:1"><button class="btn slv">M ▶ V</button><span class="lbl">AF PLAY</span></div>
+          </div>
+          <div class="reccluster">
+            <button class="btn">M1</button>
+            <button class="btn round slv">REC</button>
+            <button class="btn">M2</button>
+            <button class="btn">M3</button>
+            <span></span>
+            <button class="btn">M4</button>
+          </div>
+          <div class="bracket" style="width:100%">MESSAGE</div>
         </div>
-        <canvas id="spectrum"></canvas>
-        <canvas id="falls"></canvas>
-        <div class="cursor"></div>
-        <div class="freqscale">
-          <span>13.985</span><span>14.000</span><span>14.015</span>
-          <span>14.030</span><span>14.045</span><span>14.060</span><span>14.075</span>
-        </div>
-      </div>
-
-      <div class="keyer">
-        <div class="macros">
-          <button class="k fkey">F1<span class="sub">CQ POTA</span></button>
-          <button class="k fkey">F2<span class="sub">EXCH</span></button>
-          <button class="k fkey">F3<span class="sub">TU 73</span></button>
-          <button class="k fkey">F4<span class="sub">W6JY</span></button>
-        </div>
-        <input placeholder="KY — type to send CW…" value="TU DE W6JY 5NN CA">
+        <div class="fcol"><button class="btn lit">PRE<span class="d">4</span></button><span class="lbl">ATT</span></div>
+        <div class="fcol"><button class="btn">AGC<span class="d">5</span></button><span class="lbl">OFF</span></div>
+        <div class="fcol"><button class="btn">XFIL<span class="d">6</span></button><span class="lbl">APF</span></div>
+        <div class="fcol"><button class="btn">NB<span class="d">7</span></button><span class="lbl">LEVEL</span></div>
+        <div class="fcol"><button class="btn">NR<span class="d">8</span></button><span class="lbl">ADJ</span></div>
+        <div class="fcol"><button class="btn">NTCH<span class="d">9</span></button><span class="lbl">MANUAL</span></div>
+        <div class="fcol"><button class="btn">SPOT<span class="d">·</span></button><span class="lbl">PITCH</span></div>
+        <div class="fcol"><button class="btn">CWT<span class="d">0</span></button><span class="lbl">TEXT DEC</span></div>
+        <div class="fcol"><button class="btn">AFX</button><span class="lbl">DATA MD</span></div>
+        <div class="fcol"><button class="btn">RIT</button><span class="lbl">PF1</span></div>
+        <div class="fcol"><button class="btn">XIT</button><span class="lbl">PF2</span></div>
+        <div class="fcol"><button class="btn slv">CLR</button><span class="lbl">&nbsp;</span></div>
+        <div class="fcol" style="grid-column:4"><button class="btn slv">TUNE ▶ SPOT</button><span class="lbl">CLICK WATERFALL</span></div>
       </div>
     </div>
+  </div>
 
-    <!-- right: knobs & filter -->
-    <div class="stack" style="justify-content: space-between">
-      <div class="cluster row3">
-        <h4 style="grid-column:1/-1">VFO</h4>
-        <button class="k">A/B<span class="sub">REV</span></button>
-        <button class="k">A▶B<span class="sub">B▶A</span></button>
-        <button class="k">SPLIT<span class="sub">SPOT</span></button>
-        <button class="k">RIT<span class="sub">CLR</span></button>
-        <button class="k">XIT<span class="sub">CLR</span></button>
-        <button class="k">LOCK<span class="sub">FINE</span></button>
+  <!-- ================= P3 ================= -->
+  <div class="chassis p3unit">
+    <div class="nameplate" style="margin-bottom:8px">
+      <div class="rule"></div>
+      <span class="word" style="font-size:12px"><span class="hex">⬡</span> ELECRAFT&nbsp;&nbsp;P3&nbsp;&nbsp;PANADAPTER</span>
+      <div class="rule"></div>
+    </div>
+    <div class="p3screen">
+      <div class="p3top">
+        <span>13.985.0</span>
+        <span>▼ 14.032.50 · CW · SPAN 90 kHz</span>
+        <span>14.075.0</span>
       </div>
-      <div class="knob big">
-        <div class="cap"></div>
-        <label>VFO A</label>
+      <div class="spotstrip">
+        <span class="spot rbn" style="left:12%">F6HKA</span>
+        <span class="spot pota" style="left:29%">K4PDW</span>
+        <span class="spot rbn dupe" style="left:57%">K3WW</span>
+        <span class="spot cluster" style="left:71%">JA1NUT</span>
+        <span class="spot rbn" style="left:88%">OM2VL</span>
       </div>
-      <div class="knobrow">
-        <div class="knob small"><div class="cap"></div><label>WIDTH</label><span class="readout">400 Hz</span></div>
-        <div class="knob small"><div class="cap"></div><label>WPM</label><span class="readout">28</span></div>
+      <canvas id="spectrum"></canvas>
+      <canvas id="falls"></canvas>
+      <div class="cursor"></div>
+      <div class="freqscale">
+        <span>13.985</span><span>14.000</span><span>14.015</span><span>14.030</span>
+        <span>14.045</span><span>14.060</span><span>14.075</span>
       </div>
-      <div class="knobrow">
-        <div class="knob small"><div class="cap"></div><label>AF</label></div>
-        <div class="knob small"><div class="cap"></div><label>RF</label></div>
+      <div class="kyline">
+        <span class="tag">KY ▸</span>
+        <input value="TU DE W6JY 5NN CA" spellcheck="false">
+        <span class="tag">TEXT DECODE: CQ CQ DE F6HKA F6HKA PSE K</span>
       </div>
+    </div>
+    <div class="p3ctl">
+      <div><button class="btn slv" style="width:64px">POWER</button></div>
+      <div><button class="btn" style="width:64px">FN 1</button><div class="fl">SPOTS</div></div>
+      <div><button class="btn" style="width:64px">FN 2</button><div class="fl">RBN</div></div>
+      <div><button class="btn" style="width:64px">FN 3</button><div class="fl">POTA</div></div>
+      <div><button class="btn" style="width:64px">FN 4</button><div class="fl">AVG</div></div>
+      <div><button class="btn" style="width:64px">MENU</button><div class="fl">LABELS</div></div>
+      <div class="spacer"></div>
+      <div class="knob"><div class="kcap sm" style="width:40px;height:40px"></div><span class="kl">SELECT <em>TAP·QSY</em></span></div>
     </div>
   </div>
 </div>
 
 <script>
-// S-meter fill
+// LCD bargraph: dark segments on amber
 const sbars = document.getElementById('sbars');
-for (let i = 0; i < 28; i++) {
+for (let i = 0; i < 21; i++) {
   const bar = document.createElement('i');
-  if (i < 19) bar.className = 'lit';
+  if (i < 14) bar.className = 'on';
   sbars.appendChild(bar);
 }
 
-// ---- synthetic band: noise + keyed CW carriers ----
 const carriers = [
   { x: 0.12, snr: 22, wpm: 26 }, { x: 0.29, snr: 30, wpm: 18 },
   { x: 0.46, snr: 38, wpm: 28 }, { x: 0.57, snr: 15, wpm: 32 },
@@ -333,19 +445,19 @@ function rowPower(width) {
   const row = new Float32Array(width);
   for (let i = 0; i < width; i++) row[i] = Math.random() * 0.16 + 0.05;
   for (const c of carriers) {
-    // crude morse keying: pseudo-random on/off gated by wpm-scaled clock
     const phase = Math.floor(tick * c.wpm / 18);
     const key = ((Math.sin(phase * 12.9898 + c.x * 78.233) * 43758.5453) % 1 + 1) % 1 > 0.38;
     if (!key) continue;
     const px = Math.floor(c.x * width);
-    for (let d = -2; d <= 2; d++) {
-      const v = (c.snr / 40) * Math.exp(-(d * d) / 1.4);
+    const spread = Math.max(2, Math.round(width / 700));
+    for (let d = -spread; d <= spread; d++) {
+      const v = (c.snr / 40) * Math.exp(-(d * d) / (spread * spread * 0.6));
       if (row[px + d] !== undefined) row[px + d] += v;
     }
   }
   return row;
 }
-// P3 palette: black -> deep blue -> cyan -> white
+// P3 palette: black -> deep blue -> cyan -> white (matches real P3 default)
 function p3color(v) {
   v = Math.min(1, v);
   if (v < 0.35) { const t = v / 0.35; return [8 + 20 * t, 12 + 45 * t, 40 + 110 * t]; }
@@ -365,7 +477,6 @@ function step() {
   tick++;
   const w = falls.width;
   const row = rowPower(w);
-  // scroll waterfall down by 1
   fctx.drawImage(falls, 0, 0, w, falls.height - 1, 0, 1, w, falls.height - 1);
   const img = fctx.createImageData(w, 1);
   for (let i = 0; i < w; i++) {
@@ -373,21 +484,22 @@ function step() {
     img.data.set([r, g, b, 255], i * 4);
   }
   fctx.putImageData(img, 0, 0);
-  // spectrum line
-  sctx.fillStyle = 'oklch(0.11 0.01 250)';
+  sctx.fillStyle = '#05070d';
   sctx.fillRect(0, 0, w, spec.height);
-  sctx.strokeStyle = 'oklch(0.85 0.09 110)';
-  sctx.lineWidth = 1;
+  // green spectrum trace like the real P3
+  sctx.strokeStyle = '#9fdc6a';
+  sctx.lineWidth = 1.2 * (window.devicePixelRatio || 1);
   sctx.beginPath();
   for (let i = 0; i < w; i++) {
-    const y = spec.height - Math.min(1, row[i]) * (spec.height - 4) - 2;
+    const y = spec.height - Math.min(1, row[i]) * (spec.height - 5) - 2;
     i ? sctx.lineTo(i, y) : sctx.moveTo(i, y);
   }
   sctx.stroke();
 }
-for (let i = 0; i < falls.height; i++) step(); // pre-fill
-const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
-if (!reduced) setInterval(step, 66);
+function prefill() { for (let i = 0; i < falls.height; i++) step(); }
+prefill();
+if (!matchMedia('(prefers-reduced-motion: reduce)').matches) setInterval(step, 66);
+addEventListener('resize', () => { sizeCanvas(falls); sizeCanvas(spec); prefill(); });
 </script>
 </body>
 </html>
