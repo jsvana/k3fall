@@ -98,6 +98,8 @@ Run from your dev machine with k3fall source and SSH access to the Pi:
 make deploy PI=<pi-hostname-or-ip>
 ```
 
+The deploying user must have sudo rights on the Pi (with or without password). If using a password, the prompt will appear during deployment. To avoid password prompts, configure passwordless sudo for the deploying user on the Pi (optional).
+
 This will:
 
 1. Rsync source code to `<pi>:~/k3fall-src` (excluding target, .git, .superpowers, mockups).
