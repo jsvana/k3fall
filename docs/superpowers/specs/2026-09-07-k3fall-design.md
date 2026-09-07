@@ -126,6 +126,26 @@ Single TOML file: SDR settings (center, rate, gain, antenna port),
 serial device + baud, per-band inversion table, per-mode IF trim,
 listen address, defaults for ref/range/span.
 
+## UI Direction (decided 2026-09-07)
+
+Of the four explored mockups, the **console** direction won
+(`mockups/console.html`): dark, keyboard-first instrument console — warm
+near-black surfaces, one signal-orange accent, Archivo + Chivo Mono
+typography, giant typographic frequency readout, waterfall as the hero
+(~60% viewport), heat/ember colormap, dense spot table, telemetry rail.
+The mockup is the visual contract for the client.
+
+v1 client scope: readout row (VFO A/B, mode/filter/RIT chips), spectrum +
+waterfall with click-to-tune and hover frequency chip, frequency ruler,
+status/telemetry values that the server actually knows (SDR/CAT state,
+FFT config, frame rate). The keyer panel, spot table, and ⌘K command bar
+from the mockup are follow-ups, not v1.
+
+Rendering note: v1 uses a 2D canvas (drawImage scroll + putImageData row
+blit at devicePixelRatio) rather than WebGL2. At ≤4096 px × 30 rows/sec
+this is comfortably GPU-composited; WebGL is an upgrade path only if
+profiling demands it.
+
 ## Testing
 
 - **DSP:** synthetic-tone IQ through `FileSource` → assert tone lands
