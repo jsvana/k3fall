@@ -2,7 +2,7 @@ use std::path::Path;
 use std::sync::Arc;
 
 use anyhow::Context;
-use k3fall::{cat, config::Config, dsp, iq, web};
+use k3fall::{cat, config::Config, dsp, iq, spots, web};
 
 /// Called by the DSP thread's reconnect loop to (re)acquire an `IqSource`.
 /// Invoked once at startup and again after every stream/read failure, so it
@@ -76,12 +76,28 @@ async fn main() {
         });
     }
 
+    let (spots_tx, spots_rx) = tokio::sync::watch::channel(Vec::new());
+    if cfg.spots.enabled {
+        tokio::spawn(spots::run_spots_task(
+            cfg.bands.clone(),
+            rig_rx.clone(),
+            spots_tx,
+            cfg.spots.poll_secs,
+        ));
+    } else {
+        tokio::spawn(async move {
+            let _keep_alive = spots_tx;
+            std::future::pending::<()>().await;
+        });
+    }
+
     let state = web::AppState {
         rows: rows_tx,
         rig: rig_rx,
         tune: tune_tx,
         cfg: cfg.clone(),
         sdr_ok_rx,
+        spots_rx,
     };
 
     let app = web::router(state);

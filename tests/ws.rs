@@ -27,6 +27,7 @@ async fn websocket_streams_status_then_shaped_row() {
     let (_rig_tx, rig_rx) = watch::channel(RigState::default());
     let (tune_tx, _tune_rx) = mpsc::channel::<u64>(8);
     let (sdr_ok_tx, sdr_ok_rx) = watch::channel(true);
+    let (_spots_tx, spots_rx) = tokio::sync::watch::channel(Vec::new());
 
     {
         let rows_tx = rows_tx.clone();
@@ -53,6 +54,7 @@ async fn websocket_streams_status_then_shaped_row() {
         tune: tune_tx,
         cfg: cfg.clone(),
         sdr_ok_rx,
+        spots_rx,
     };
 
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();

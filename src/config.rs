@@ -5,6 +5,8 @@ use std::path::PathBuf;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
+    #[serde(default)]
+    pub spots: SpotsConfig,
     pub sdr: SdrConfig,
     pub cat: CatConfig,
     pub dsp: DspConfig,
@@ -61,6 +63,7 @@ impl Config {
 
     pub fn default_dev() -> Config {
         Config {
+            spots: SpotsConfig::default(),
             sdr: SdrConfig {
                 driver: "file".to_string(),
                 file_path: None,
@@ -178,4 +181,31 @@ mod tests {
         assert_eq!(cfg.sdr.driver, "file");
         assert!(!cfg.cat.enabled);
     }
+}
+
+/// Spot enrichment sources (RBN + POTA). Defaults on; absent from older
+/// config files, hence the serde defaults.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SpotsConfig {
+    #[serde(default = "default_spots_enabled")]
+    pub enabled: bool,
+    #[serde(default = "default_spots_poll_secs")]
+    pub poll_secs: u64,
+}
+
+impl Default for SpotsConfig {
+    fn default() -> Self {
+        Self {
+            enabled: default_spots_enabled(),
+            poll_secs: default_spots_poll_secs(),
+        }
+    }
+}
+
+fn default_spots_enabled() -> bool {
+    true
+}
+
+fn default_spots_poll_secs() -> u64 {
+    30
 }

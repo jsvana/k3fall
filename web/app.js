@@ -162,7 +162,7 @@
     for (const s of RULER_STEPS) if (s >= raw) return s;
     return RULER_STEPS[RULER_STEPS.length - 1];
   }
-  function buildRuler() {
+  function buildRulerInner() {
     freqruler.innerHTML = '';
     if (!lastFrame) return;
     const { centerHz, spanHz: span } = lastFrame;
@@ -181,6 +181,11 @@
       freqruler.appendChild(el);
     }
   }
+  function buildRuler() {
+    buildRulerInner();
+    renderSpots();
+  }
+
   function maybeRebuildRuler() {
     if (!lastFrame) return;
     const key = `${lastFrame.centerHz}|${lastFrame.spanHz}|${lastFrame.flags}|${currentDir()}`;
@@ -282,6 +287,39 @@
     teleSpan.textContent = (spanHz / 1000).toFixed(1);
   }
 
+  let spots = [];
+  const spotLayer = document.getElementById('spotlayer');
+
+  function renderSpots() {
+    spotLayer.textContent = '';
+    if (!lastFrame) return;
+    for (const s of spots) {
+      const frac = fracForFreq(s.freq_hz);
+      if (frac < 0 || frac > 1) continue;
+      const el = document.createElement('span');
+      el.className = 'smark ' + (s.source === 'pota' ? 'pota' : 'rbn') +
+        (s.age_s > 300 ? ' stale' : '');
+      el.style.left = (frac * 100).toFixed(2) + '%';
+      el.textContent = s.callsign;
+      if (s.label) {
+        const extra = document.createElement('i');
+        extra.textContent = s.label;
+        el.appendChild(extra);
+      } else if (s.snr_db != null) {
+        const extra = document.createElement('i');
+        extra.textContent = s.snr_db + 'dB';
+        el.appendChild(extra);
+      }
+      el.title = s.callsign + ' \u00b7 ' + formatFreq(s.freq_hz) +
+        (s.label ? ' \u00b7 ' + s.label : '') + ' \u00b7 ' + Math.round(s.age_s / 60) + 'm ago';
+      el.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        sendTune(s.freq_hz);
+      });
+      spotLayer.appendChild(el);
+    }
+  }
+
   function handleStatus(msg) {
     status = msg;
     spanHz = msg.sample_rate;
@@ -313,6 +351,7 @@
     if (msg.type === 'status') handleStatus(msg);
     else if (msg.type === 'rig') handleRig(msg);
     else if (msg.type === 'error') showBanner(msg.message);
+    else if (msg.type === 'spots') { spots = msg.spots || []; renderSpots(); }
   }
 
   function handleRowFrame(buf) {
@@ -365,7 +404,7 @@
     (e) => {
       e.preventDefault();
       if (!status) return;
-      const factor = e.deltaY < 0 ? 0.5 : 2;
+      const factor = e.deltaY > 0 ? 0.5 : 2;
       const minSpan = Math.max(1, status.bin_hz * 16);
       const maxSpan = status.sample_rate;
       const next = Math.min(maxSpan, Math.max(minSpan, Math.round(spanHz * factor)));
@@ -378,13 +417,17 @@
     { passive: false },
   );
 
+  function sendTune(freqHz) {
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    const rounded = Math.round(freqHz / 10) * 10;
+    ws.send(JSON.stringify({ type: 'tune', freq_hz: rounded }));
+  }
+
   scopeEl.addEventListener('click', (e) => {
-    if (!lastFrame || !ws || ws.readyState !== WebSocket.OPEN) return;
+    if (!lastFrame) return;
     const rect = scopeEl.getBoundingClientRect();
     const x = e.clientX - rect.left;
-    const freq = freqAt(x, rect.width);
-    const rounded = Math.round(freq / 10) * 10;
-    ws.send(JSON.stringify({ type: 'tune', freq_hz: rounded }));
+    sendTune(freqAt(x, rect.width));
   });
 
   scopeEl.addEventListener('mousemove', (e) => {

@@ -90,6 +90,22 @@ pub enum ServerMsg {
     Error {
         message: String,
     },
+    Spots {
+        spots: Vec<Spot>,
+    },
+}
+
+/// One enrichment spot pinned to a frequency on the waterfall.
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub struct Spot {
+    pub callsign: String,
+    pub freq_hz: u64,
+    /// "rbn" | "pota"
+    pub source: String,
+    pub snr_db: Option<i32>,
+    /// Extra context, e.g. a POTA park reference.
+    pub label: Option<String>,
+    pub age_s: u32,
 }
 
 #[cfg(test)]

@@ -6,4 +6,5 @@ pub mod protocol;
 pub mod shaping;
 #[cfg(feature = "soapy")]
 pub mod soapy;
+pub mod spots;
 pub mod web;

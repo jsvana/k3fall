@@ -1,6 +1,7 @@
 [Unit]
 Description=k3fall K3 IF waterfall server
-After=network.target
+After=network.target sdrplay.service
+Wants=sdrplay.service
 
 [Service]
 ExecStart=/usr/local/bin/k3fall /etc/k3fall/config.toml

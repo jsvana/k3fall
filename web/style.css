@@ -92,3 +92,16 @@ body.disconnected .topbar .tele { opacity: 0.5; }
           background: oklch(0.28 0.09 30); border: 1px solid var(--bad); color: var(--ink);
           padding: 8px 16px; border-radius: 6px; font-size: 0.78rem; z-index: 20;
           box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4); }
+
+/* --- spot enrichment flags --- */
+.spotlayer { position: absolute; top: 0; left: 0; right: 0; height: 20px; z-index: 4;
+             pointer-events: none; }
+.smark { position: absolute; top: 0; transform: translateX(-50%);
+         font-family: "Chivo Mono", monospace; font-size: 0.68rem; font-weight: 500;
+         padding: 1px 5px 2px; border-radius: 0 0 4px 4px; color: var(--bg);
+         cursor: pointer; pointer-events: auto; white-space: nowrap; }
+.smark i { font-style: normal; opacity: 0.75; margin-left: 4px; }
+.smark.rbn { background: var(--rbn, oklch(0.7 0.11 250)); }
+.smark.pota { background: var(--pota, oklch(0.73 0.13 150)); }
+.smark.stale { opacity: 0.45; }
+.smark:hover { filter: brightness(1.15); }

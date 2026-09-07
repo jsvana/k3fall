@@ -17,7 +17,7 @@ use tokio::sync::{broadcast, mpsc, watch};
 use crate::cat::{direction_for, RigState};
 use crate::config::Config;
 use crate::dsp::SpectrumRow;
-use crate::protocol::{encode_row, ClientMsg, RowFrameHeader, ServerMsg, FLAG_INVERTED};
+use crate::protocol::{encode_row, ClientMsg, RowFrameHeader, ServerMsg, Spot, FLAG_INVERTED};
 use crate::shaping::shape_row;
 
 /// Maximum number of `Tune` requests accepted from a single client per
@@ -39,6 +39,8 @@ pub struct AppState {
     /// lets active websocket sessions react immediately when it changes
     /// instead of only reporting the value seen at connect time.
     pub sdr_ok_rx: watch::Receiver<bool>,
+    /// Latest merged enrichment spots (RBN/POTA) for the current band.
+    pub spots_rx: watch::Receiver<Vec<Spot>>,
 }
 
 pub fn router(state: AppState) -> Router {
@@ -267,6 +269,18 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
     if send_rig(&mut sender, &state).await.is_err() {
         return;
     }
+    let mut spots_rx = state.spots_rx.clone();
+    let mut spots_closed = false;
+    {
+        let spots = spots_rx.borrow().clone();
+        if !spots.is_empty()
+            && send_json(&mut sender, &ServerMsg::Spots { spots })
+                .await
+                .is_err()
+        {
+            return;
+        }
+    }
 
     let mut rows_rx = state.rows.subscribe();
     let mut rig_rx = state.rig.clone();
@@ -340,6 +354,19 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
                         // Sender side closed; stop selecting on this branch
                         // so we don't spin on an already-resolved future.
                         sdr_ok_closed = true;
+                    }
+                }
+            }
+            changed = spots_rx.changed(), if !spots_closed => {
+                match changed {
+                    Ok(()) => {
+                        let spots = spots_rx.borrow().clone();
+                        if send_json(&mut sender, &ServerMsg::Spots { spots }).await.is_err() {
+                            break;
+                        }
+                    }
+                    Err(_) => {
+                        spots_closed = true;
                     }
                 }
             }
