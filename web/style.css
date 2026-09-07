@@ -1,2 +1,94 @@
-/* k3fall waterfall client styles placeholder.
-   Real styling is implemented in a later task. */
+:root {
+  --bg: oklch(0.16 0.008 60);          /* warm near-black */
+  --bg-raise: oklch(0.19 0.009 60);
+  --line: oklch(0.28 0.01 60);
+  --line-soft: oklch(0.23 0.009 60);
+  --ink: oklch(0.9 0.008 75);
+  --ink-2: oklch(0.62 0.012 70);
+  --ink-3: oklch(0.45 0.012 70);
+  --accent: oklch(0.72 0.16 55);       /* signal orange */
+  --accent-dim: oklch(0.5 0.1 55);
+  --ok: oklch(0.75 0.13 150);
+  --bad: oklch(0.62 0.19 25);
+  font-size: 14px;
+}
+* { box-sizing: border-box; margin: 0; }
+body {
+  background: var(--bg); color: var(--ink);
+  font-family: Archivo, sans-serif;
+  height: 100vh; display: flex; flex-direction: column; overflow: hidden;
+  position: relative;
+}
+.mono { font-family: "Chivo Mono", monospace; }
+
+/* ---- top status strip ---- */
+.topbar {
+  display: flex; align-items: center; gap: 20px; flex: none;
+  padding: 10px 20px; border-bottom: 1px solid var(--line);
+}
+.station { font-weight: 700; letter-spacing: 2px; font-size: 0.95rem; }
+.station em { color: var(--accent); font-style: normal; }
+.topbar .tele {
+  margin-left: auto; display: flex; align-items: center; gap: 18px;
+  font-family: "Chivo Mono", monospace; font-size: 0.72rem; color: var(--ink-2);
+}
+.ind .dot { color: var(--ink-3); margin-right: 5px; font-size: 0.62rem; }
+.ind.on .dot { color: var(--ok); }
+.clock { color: var(--ink); }
+
+/* ---- readout row ---- */
+.readout {
+  display: flex; align-items: baseline; gap: 28px; flex: none;
+  padding: 14px 24px 12px; border-bottom: 1px solid var(--line);
+}
+.vfoa { font-family: "Chivo Mono", monospace; font-weight: 300;
+        font-size: 4.4rem; line-height: 1; letter-spacing: -0.02em; }
+.vfoa .khz { color: var(--accent); }
+.vfoa .hz { font-size: 2.2rem; color: var(--ink-2); }
+.chips { display: flex; gap: 8px; align-self: center; }
+.chip { font-family: "Chivo Mono", monospace; font-size: 0.72rem; letter-spacing: 1px;
+        padding: 4px 9px; border: 1px solid var(--line); border-radius: 4px; color: var(--ink-2); }
+.chip.on { border-color: var(--accent-dim); color: var(--accent); }
+#chip-inv { cursor: pointer; user-select: none; }
+#chip-inv:hover { border-color: var(--ink-2); }
+.subvfo { margin-left: auto; text-align: right; font-family: "Chivo Mono", monospace; }
+.subvfo .b { font-size: 1.5rem; color: var(--ink-2); }
+.subvfo .lbl { font-size: 0.68rem; letter-spacing: 2px; color: var(--ink-3); }
+
+/* ---- scope ---- */
+.scope { flex: 1; position: relative; min-height: 0; cursor: crosshair;
+         display: flex; flex-direction: column; }
+canvas { display: block; width: 100%; }
+#spectrum { flex: none; height: 88px; border-bottom: 1px solid var(--line-soft); }
+#falls { flex: 1; min-height: 0; }
+.vfoline { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--accent);
+           opacity: 0.9; pointer-events: none; }
+.vfoline::after { content: "\25BC"; position: absolute; top: -2px; left: -4.5px;
+                   color: var(--accent); font-size: 9px; }
+.hoverchip { position: absolute; font-family: "Chivo Mono", monospace; font-size: 0.72rem;
+             background: var(--bg-raise); border: 1px solid var(--accent-dim);
+             color: var(--ink); border-radius: 4px; padding: 3px 8px; pointer-events: none;
+             transform: translateX(-50%); white-space: nowrap; z-index: 5; }
+.freqruler { position: absolute; bottom: 0; left: 0; right: 0; height: 18px;
+             font-family: "Chivo Mono", monospace; font-size: 0.66rem; color: var(--ink-2);
+             background: color-mix(in oklab, var(--bg) 78%, transparent); }
+.freqruler span { position: absolute; top: 2px; transform: translateX(-50%); }
+.disconnected-overlay { position: absolute; inset: 0; display: none; align-items: center;
+                         justify-content: center; letter-spacing: 2px; color: var(--ink-2);
+                         background: color-mix(in oklab, var(--bg) 55%, transparent); }
+body.disconnected .disconnected-overlay { display: flex; }
+body.disconnected .scope canvas { filter: grayscale(1) brightness(0.55); }
+body.disconnected .readout,
+body.disconnected .topbar .tele { opacity: 0.5; }
+
+/* ---- bottom telemetry strip ---- */
+.deck { display: flex; align-items: center; gap: 22px; flex: none;
+        padding: 8px 20px; border-top: 1px solid var(--line);
+        font-size: 0.72rem; color: var(--ink-2); }
+.deck b { color: var(--ink); font-weight: 500; }
+
+/* ---- error banner ---- */
+.banner { position: fixed; top: 14px; left: 50%; transform: translateX(-50%);
+          background: oklch(0.28 0.09 30); border: 1px solid var(--bad); color: var(--ink);
+          padding: 8px 16px; border-radius: 6px; font-size: 0.78rem; z-index: 20;
+          box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4); }

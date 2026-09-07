@@ -1,13 +1,55 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>k3fall</title>
-    <link rel="stylesheet" href="/style.css">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>k3fall</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=Chivo+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/style.css">
 </head>
-<body>
-    <canvas id="falls"></canvas>
-    <script src="/app.js"></script>
+<body class="disconnected">
+
+<div class="topbar">
+  <span class="station"><em>&#9670;</em> W6JY</span>
+  <div class="tele">
+    <span class="ind" id="ind-cat"><span class="dot">&#9679;</span>K3</span>
+    <span class="ind" id="ind-sdr"><span class="dot">&#9679;</span>IQ</span>
+    <span class="clock mono" id="clock">--:--:--z</span>
+  </div>
+</div>
+
+<div class="readout">
+  <div class="vfoa mono" id="vfoa">--.<span class="khz">---</span><span class="hz">.--</span></div>
+  <div class="chips">
+    <span class="chip on" id="chip-mode">CW</span>
+    <span class="chip" id="chip-inv" title="Invert display direction">INV</span>
+  </div>
+  <div class="subvfo">
+    <div class="lbl">VFO B</div>
+    <div class="b mono" id="vfob">--.---.--</div>
+  </div>
+</div>
+
+<div class="scope" id="scope">
+  <canvas id="spectrum"></canvas>
+  <canvas id="falls"></canvas>
+  <div class="vfoline" id="vfoline" hidden></div>
+  <div class="hoverchip mono" id="hoverchip" hidden></div>
+  <div class="freqruler mono" id="freqruler"></div>
+  <div class="disconnected-overlay mono" id="disc-overlay">disconnected &mdash; reconnecting&hellip;</div>
+</div>
+
+<div class="deck mono">
+  <span>fft <b id="tele-fft">&mdash;</b></span>
+  <span>bin <b id="tele-bin">&mdash;</b> Hz</span>
+  <span>rows <b id="tele-rows">&mdash;</b>/s</span>
+  <span>span <b id="tele-span">&mdash;</b> kHz</span>
+  <span>fps <b id="tele-fps">&mdash;</b></span>
+</div>
+
+<div class="banner mono" id="banner" hidden></div>
+
+<script src="/app.js"></script>
 </body>
 </html>
