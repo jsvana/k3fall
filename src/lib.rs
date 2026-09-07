@@ -4,4 +4,6 @@ pub mod dsp;
 pub mod iq;
 pub mod protocol;
 pub mod shaping;
+#[cfg(feature = "soapy")]
+pub mod soapy;
 pub mod web;

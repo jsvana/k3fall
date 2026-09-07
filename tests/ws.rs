@@ -23,8 +23,6 @@ async fn websocket_streams_status_then_shaped_row() {
     // A single tone is enough to drive the DSP pipeline; we only care that
     // rows keep flowing, not about spectral content here.
     let samples = tone(sample_rate, 10_000.0, 0.2, sample_rate as usize * 2);
-    let source: Box<dyn k3fall::iq::IqSource> =
-        Box::new(FileSource::from_samples(samples, sample_rate));
 
     let (rows_tx, _rows_rx) = broadcast::channel::<SpectrumRow>(32);
     let (_rig_tx, rig_rx) = watch::channel(RigState::default());
@@ -34,10 +32,20 @@ async fn websocket_streams_status_then_shaped_row() {
     {
         let rows_tx = rows_tx.clone();
         let dsp_cfg = cfg.dsp.clone();
-        // pace=true keeps the thread from flooding the broadcast channel
-        // faster than the test can keep up with.
+        let sdr_ok = sdr_ok.clone();
+        // The reconnect loop only calls this closure once here since the
+        // in-memory tone source never errors; pace=true keeps the thread
+        // from flooding the broadcast channel faster than the test can keep
+        // up with.
+        let make_source: Box<dyn FnMut() -> anyhow::Result<Box<dyn k3fall::iq::IqSource>> + Send> =
+            Box::new(move || {
+                Ok(
+                    Box::new(FileSource::from_samples(samples.clone(), sample_rate))
+                        as Box<dyn k3fall::iq::IqSource>,
+                )
+            });
         std::thread::spawn(move || {
-            run_dsp_thread(source, dsp_cfg, rows_tx, true);
+            run_dsp_thread(make_source, dsp_cfg, rows_tx, true, sdr_ok);
         });
     }
 

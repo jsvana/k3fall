@@ -4,6 +4,7 @@ use num_complex::Complex;
 use rustfft::{Fft, FftPlanner};
 use std::collections::VecDeque;
 use std::f32::consts::TAU;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 #[derive(Clone)]
@@ -97,41 +98,77 @@ pub fn quantize(db: &[f32], ref_level_db: f32, range_db: f32) -> Vec<u8> {
         .collect()
 }
 
+/// How long to wait between (re)connect attempts after a source fails to
+/// open or a stream read errors out.
+const RECONNECT_DELAY: std::time::Duration = std::time::Duration::from_secs(3);
+
+/// Drive the DSP pipeline forever, (re)acquiring the IQ source as needed.
+///
+/// `make_source` is called each time a source is needed: once at startup,
+/// and again any time the current source fails a read (e.g. the SDR was
+/// unplugged). This lets hardware sources be re-opened from scratch on
+/// reconnect while file/dev sources can simply hand back a fresh copy.
+///
+/// `sdr_ok` reflects whether a source is currently open and being read from
+/// successfully; it flips to `false` while there is no live source (either
+/// because `make_source` is failing, or the previous source's stream just
+/// errored and hasn't been replaced yet).
 pub fn run_dsp_thread(
-    source: Box<dyn IqSource>,
+    mut make_source: Box<dyn FnMut() -> anyhow::Result<Box<dyn IqSource>> + Send>,
     cfg: DspConfig,
     tx: tokio::sync::broadcast::Sender<SpectrumRow>,
     pace: bool,
+    sdr_ok: Arc<AtomicBool>,
 ) {
-    let mut source = source;
-    let sample_rate = source.sample_rate();
-    let mut dsp = Dsp::new(&cfg, sample_rate);
-    let hop = compute_hop(sample_rate, cfg.rows_per_sec);
-    let mut buf = vec![Complex::new(0.0f32, 0.0); hop];
-    let sleep_dur = std::time::Duration::from_secs_f64(hop as f64 / sample_rate as f64);
     let mut seq: u32 = 0;
 
     loop {
-        match source.read(&mut buf) {
-            Ok(n) => {
-                let rows = dsp.process(&buf[..n]);
-                for bins in rows {
-                    let row = SpectrumRow {
-                        seq,
-                        bins: Arc::new(bins),
-                    };
-                    seq = seq.wrapping_add(1);
-                    let _ = tx.send(row);
-                }
-                if pace {
-                    std::thread::sleep(sleep_dur);
-                }
+        let mut source = match make_source() {
+            Ok(source) => source,
+            Err(err) => {
+                sdr_ok.store(false, Ordering::Relaxed);
+                tracing::warn!("failed to open IQ source: {err}; retrying in {RECONNECT_DELAY:?}");
+                std::thread::sleep(RECONNECT_DELAY);
+                continue;
             }
-            Err(e) => {
-                tracing::warn!("dsp source read error: {e}");
-                std::thread::sleep(std::time::Duration::from_secs(1));
+        };
+        sdr_ok.store(true, Ordering::Relaxed);
+
+        let sample_rate = source.sample_rate();
+        let mut dsp = Dsp::new(&cfg, sample_rate);
+        let hop = compute_hop(sample_rate, cfg.rows_per_sec);
+        let mut buf = vec![Complex::new(0.0f32, 0.0); hop];
+        let sleep_dur = std::time::Duration::from_secs_f64(hop as f64 / sample_rate as f64);
+
+        loop {
+            match source.read(&mut buf) {
+                Ok(n) => {
+                    let rows = dsp.process(&buf[..n]);
+                    for bins in rows {
+                        let row = SpectrumRow {
+                            seq,
+                            bins: Arc::new(bins),
+                        };
+                        seq = seq.wrapping_add(1);
+                        let _ = tx.send(row);
+                    }
+                    if pace {
+                        std::thread::sleep(sleep_dur);
+                    }
+                }
+                Err(e) => {
+                    sdr_ok.store(false, Ordering::Relaxed);
+                    tracing::warn!(
+                        "dsp source read error: {e}; dropping source and retrying in {RECONNECT_DELAY:?}"
+                    );
+                    break;
+                }
             }
         }
+        // `source` is dropped here, releasing any hardware handle, before
+        // the outer loop retries `make_source`.
+        drop(source);
+        std::thread::sleep(RECONNECT_DELAY);
     }
 }
 

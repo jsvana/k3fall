@@ -1,8 +1,14 @@
 use std::path::Path;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 
+use anyhow::Context;
 use k3fall::{cat, config::Config, dsp, iq, web};
+
+/// Called by the DSP thread's reconnect loop to (re)acquire an `IqSource`.
+/// Invoked once at startup and again after every stream/read failure, so it
+/// must fully rebuild the source rather than reuse any prior hardware state.
+type SourceFactory = Box<dyn FnMut() -> anyhow::Result<Box<dyn iq::IqSource>> + Send>;
 
 #[tokio::main]
 async fn main() {
@@ -12,11 +18,11 @@ async fn main() {
     let config_path = args.get(1).map(String::as_str).unwrap_or("config.toml");
     let path = Path::new(config_path);
 
-    let (cfg, source, pace) = if path.exists() {
+    let (cfg, make_source, pace) = if path.exists() {
         match Config::load(path) {
             Ok(cfg) => {
-                let source = build_source(&cfg);
-                (cfg, source, true)
+                let make_source = build_source(&cfg);
+                (cfg, make_source, true)
             }
             Err(err) => {
                 tracing::error!(
@@ -42,11 +48,10 @@ async fn main() {
     {
         let rows_tx = rows_tx.clone();
         let dsp_cfg = cfg.dsp.clone();
-        // A `file`-backed source is considered working the moment it's been
-        // constructed, so mark the SDR healthy right before handing it off
-        // to the DSP thread. Task 9 makes this reflect real hardware state.
-        sdr_ok.store(true, Ordering::Relaxed);
-        std::thread::spawn(move || dsp::run_dsp_thread(source, dsp_cfg, rows_tx, pace));
+        let sdr_ok = sdr_ok.clone();
+        std::thread::spawn(move || {
+            dsp::run_dsp_thread(make_source, dsp_cfg, rows_tx, pace, sdr_ok)
+        });
     }
 
     let (rig_tx, rig_rx) = tokio::sync::watch::channel(cat::RigState::default());
@@ -83,30 +88,54 @@ async fn main() {
         .expect("axum server exited with an error");
 }
 
-/// Build an `IqSource` from a loaded config. Only the `file` driver is
-/// implemented in this build; hardware drivers (e.g. SoapySDR) are out of
-/// scope for the web server task.
-fn build_source(cfg: &Config) -> Box<dyn iq::IqSource> {
+/// Build a `SourceFactory` from a loaded config.
+///
+/// The `file` driver re-opens the file from disk on every call, which is
+/// what lets the DSP thread's reconnect loop recover if the file
+/// disappears/reappears. The `sdrplay` driver requires the `soapy` cargo
+/// feature; without it we fail fast with a clear error rather than looping
+/// forever on an unsupported driver.
+fn build_source(cfg: &Config) -> SourceFactory {
     match cfg.sdr.driver.as_str() {
         "file" => {
             let path = cfg
                 .sdr
                 .file_path
-                .as_ref()
+                .clone()
                 .unwrap_or_else(|| panic!("sdr.driver = \"file\" requires sdr.file_path"));
-            let source = iq::FileSource::open(path, cfg.sdr.sample_rate)
-                .unwrap_or_else(|err| panic!("failed to open IQ file {}: {err}", path.display()));
-            Box::new(source)
+            let sample_rate = cfg.sdr.sample_rate;
+            Box::new(move || {
+                let source = iq::FileSource::open(&path, sample_rate)
+                    .with_context(|| format!("failed to open IQ file {}", path.display()))?;
+                Ok(Box::new(source) as Box<dyn iq::IqSource>)
+            })
+        }
+        "sdrplay" => {
+            #[cfg(feature = "soapy")]
+            {
+                let sdr_cfg = cfg.sdr.clone();
+                Box::new(move || {
+                    let source = k3fall::soapy::SoapySource::open(&sdr_cfg)?;
+                    Ok(Box::new(source) as Box<dyn iq::IqSource>)
+                })
+            }
+            #[cfg(not(feature = "soapy"))]
+            {
+                panic!(
+                    "sdr.driver = \"sdrplay\" requires building with `--features soapy` \
+                     (this build was compiled without SoapySDR support)"
+                )
+            }
         }
         other => {
-            panic!("unsupported sdr driver '{other}': only 'file' is implemented in this build")
+            panic!("unsupported sdr driver '{other}': only 'file' and 'sdrplay' are implemented")
         }
     }
 }
 
 /// Dev-mode fallback used when no config file is found: a synthesized
 /// multi-tone signal standing in for a real SDR/K3 IF feed.
-fn dev_mode() -> (Config, Box<dyn iq::IqSource>, bool) {
+fn dev_mode() -> (Config, SourceFactory, bool) {
     let cfg = Config::default_dev();
     let sample_rate = cfg.sdr.sample_rate;
     let len = sample_rate as usize * 2; // 2 seconds of samples
@@ -124,6 +153,15 @@ fn dev_mode() -> (Config, Box<dyn iq::IqSource>, bool) {
         }
     }
 
-    let source: Box<dyn iq::IqSource> = Box::new(iq::FileSource::from_samples(signal, sample_rate));
-    (cfg, source, true)
+    // Cache the synthesized signal and hand back a fresh clone each time the
+    // factory is called, so the DSP thread's reconnect loop behaves the same
+    // way here as it does for real sources.
+    let signal = Arc::new(signal);
+    let make_source: SourceFactory = Box::new(move || {
+        Ok(
+            Box::new(iq::FileSource::from_samples((*signal).clone(), sample_rate))
+                as Box<dyn iq::IqSource>,
+        )
+    });
+    (cfg, make_source, true)
 }
