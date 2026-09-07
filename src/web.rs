@@ -1,4 +1,5 @@
 use std::collections::VecDeque;
+use std::pin::Pin;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -9,8 +10,9 @@ use axum::http::header;
 use axum::response::{IntoResponse, Response};
 use axum::routing::get;
 use axum::Router;
+use futures_util::future::poll_fn;
 use futures_util::stream::SplitSink;
-use futures_util::{FutureExt, SinkExt, StreamExt};
+use futures_util::{FutureExt, Sink, SinkExt, StreamExt};
 use tokio::sync::{broadcast, mpsc, watch};
 
 use crate::cat::{direction_for, RigState};
@@ -167,6 +169,50 @@ async fn send_rig(
     send_json(sender, &msg).await
 }
 
+/// Try to push the most recently computed row frame through the socket
+/// without blocking the session loop.
+///
+/// `pending` always holds at most one frame: the newest row we haven't
+/// managed to hand to the sink yet. We only call `start_send` (via `feed`)
+/// once `ready()` reports the sink can accept it — `tokio-tungstenite`'s
+/// `poll_ready` drains any previously buffered-but-unflushed frame first,
+/// so gating on `ready()` guarantees we never have more than one frame
+/// in flight in the sink plus the one frame held in `pending`. If the sink
+/// isn't ready, the frame stays in `pending` and will be overwritten by the
+/// next row that arrives before we get another chance to send — i.e. the
+/// newest row always wins, older stalled rows are discarded.
+///
+/// Returns `true` if the connection should be closed due to a fatal sink
+/// error.
+async fn try_send_pending(
+    sender: &mut SplitSink<WebSocket, Message>,
+    pending: &mut Option<Vec<u8>>,
+) -> bool {
+    let Some(frame) = pending.take() else {
+        return false;
+    };
+    let ready = poll_fn(|cx| Pin::new(&mut *sender).poll_ready(cx)).now_or_never();
+    match ready {
+        Some(Ok(())) => {
+            if sender.feed(Message::Binary(frame)).await.is_err() {
+                return true;
+            }
+            // Kick off the actual write; if it can't complete immediately
+            // the sink keeps draining it on the next `ready()`/`feed()`
+            // call, so we don't need to await it here.
+            let _ = sender.flush().now_or_never();
+            false
+        }
+        Some(Err(_)) => true,
+        None => {
+            // Not ready: leave this frame in the slot so a newer row (if
+            // one shows up before we retry) can still overwrite it.
+            *pending = Some(frame);
+            false
+        }
+    }
+}
+
 async fn handle_socket(socket: WebSocket, state: AppState) {
     let (mut sender, mut receiver) = socket.split();
 
@@ -197,6 +243,9 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
     let mut rig_closed = false;
     let mut view = View::new(sample_rate);
     let mut tune_timestamps: VecDeque<Instant> = VecDeque::with_capacity(TUNE_RATE_LIMIT);
+    // Holds at most one not-yet-sent row frame: the newest one, so a slow
+    // socket drops stale rows instead of a backlog building up.
+    let mut pending_row: Option<Vec<u8>> = None;
 
     loop {
         tokio::select! {
@@ -215,17 +264,13 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
                             bins: shaped.len() as u16,
                             flags: if direction == -1 { FLAG_INVERTED } else { 0 },
                         };
-                        let frame = encode_row(&header, &shaped);
-
-                        // Backpressure: never queue a second row behind one
-                        // still in flight. If the send wouldn't complete
-                        // immediately, drop this row and wait for the next.
-                        match sender.send(Message::Binary(frame)).now_or_never() {
-                            Some(Ok(())) => {}
-                            Some(Err(_)) => break,
-                            None => {
-                                tracing::debug!("dropping row: websocket send would block");
-                            }
+                        // Newest row always overwrites whatever was still
+                        // waiting to go out (explicit discard of any stale
+                        // frame so the intent reads clearly).
+                        let _ = pending_row.take();
+                        pending_row = Some(encode_row(&header, &shaped));
+                        if try_send_pending(&mut sender, &mut pending_row).await {
+                            break;
                         }
                     }
                     Err(broadcast::error::RecvError::Lagged(skipped)) => {
@@ -318,8 +363,21 @@ async fn handle_client_text(
                 return;
             }
             tune_timestamps.push_back(now);
-            if state.tune.send(freq_hz).await.is_err() {
-                tracing::debug!("tune channel closed; CAT task may have shut down");
+            match state.tune.try_send(freq_hz) {
+                Ok(()) => {}
+                Err(mpsc::error::TrySendError::Full(_)) => {
+                    tracing::debug!(freq_hz, "tune channel full; dropping request");
+                    let _ = send_json(
+                        sender,
+                        &ServerMsg::Error {
+                            message: "tune busy, dropped".to_string(),
+                        },
+                    )
+                    .await;
+                }
+                Err(mpsc::error::TrySendError::Closed(_)) => {
+                    tracing::debug!("tune channel closed; CAT task may have shut down");
+                }
             }
         }
         Ok(ClientMsg::Display {

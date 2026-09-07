@@ -95,7 +95,12 @@ async fn websocket_streams_status_then_shaped_row() {
         };
         if let WsMessage::Binary(bytes) = next {
             let (header, payload) = decode_row(&bytes).expect("row frame decodes");
-            assert_eq!(header.bins as usize, 512);
+            // The default 1024-wide view can race a binary frame in before
+            // our view negotiation lands server-side; skip those and keep
+            // waiting for the 512-bin frame we asked for.
+            if header.bins as usize != 512 {
+                continue;
+            }
             assert_eq!(payload.len(), 512);
             got_row = true;
             break;
