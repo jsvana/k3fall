@@ -51,7 +51,7 @@ pub fn spawn_capture(cfg: crate::config::AudioConfig, tx: broadcast::Sender<Audi
                     }
                 }
                 Err(err) => {
-                    tracing::debug!(?err, device = %cfg.device, "audio: open failed; retrying");
+                    tracing::warn!(?err, device = %cfg.device, "audio: open failed; retrying");
                 }
             }
             std::thread::sleep(std::time::Duration::from_secs(3));

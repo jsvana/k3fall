@@ -8,7 +8,7 @@ ExecStart=/usr/local/bin/k3fall /etc/k3fall/config.toml
 Restart=on-failure
 RestartSec=3
 User=k3fall
-SupplementaryGroups=dialout plugdev
+SupplementaryGroups=dialout plugdev audio
 StateDirectory=k3fall
 
 [Install]
