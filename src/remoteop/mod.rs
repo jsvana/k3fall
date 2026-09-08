@@ -6,6 +6,7 @@
 
 pub mod frames;
 
+use crate::audio::AudioPacket;
 use crate::cat::{direction_for, RigState};
 use crate::config::Config;
 use crate::dsp::SpectrumRow;
@@ -113,6 +114,8 @@ pub struct Deps {
     pub tune: mpsc::Sender<u64>,
     pub cat_raw: mpsc::Sender<String>,
     pub state: Arc<RemoteState>,
+    pub audio: broadcast::Sender<AudioPacket>,
+    pub audio_enabled: bool,
 }
 
 pub async fn run_server(listen: String, deps: Arc<Deps>) {
@@ -211,6 +214,7 @@ async fn handle_conn(sock: tokio::net::TcpStream, deps: Arc<Deps>) -> anyhow::Re
     let mut authed = false;
     let mut subs: HashSet<String> = HashSet::new();
     let mut rows_rx = deps.rows.subscribe();
+    let mut audio_rx = deps.audio.subscribe();
     let mut rig_rx = deps.rig.clone();
     let mut spots_rx = deps.spots.clone();
     let mut sent_spot_ids: HashSet<String> = HashSet::new();
@@ -318,6 +322,20 @@ async fn handle_conn(sock: tokio::net::TcpStream, deps: Arc<Deps>) -> anyhow::Re
                                 radio_id: "k3fall".into(),
                                 timestamp: now_iso8601(),
                             }))),
+                            "radio.audio" => {
+                                if deps.audio_enabled {
+                                    send!(Frame::EventAudioFormat(W::new(AudioFormatEvent {
+                                        radio_id: "k3fall".into(),
+                                        source_label: deps.cfg.audio.label.clone(),
+                                        codec: "pcm_s16le".into(),
+                                        sample_rate: i64::from(deps.cfg.audio.sample_rate),
+                                        channels: 1,
+                                        bits_per_sample: 16,
+                                        frames_per_packet: None,
+                                        timestamp: now_iso8601(),
+                                    })));
+                                }
+                            }
                             _ => {}
                         }
                     }
@@ -403,6 +421,22 @@ async fn handle_conn(sock: tokio::net::TcpStream, deps: Arc<Deps>) -> anyhow::Re
                     }
                     Err(broadcast::error::RecvError::Lagged(_)) => {
                         rows_rx = rows_rx.resubscribe();
+                    }
+                    Err(broadcast::error::RecvError::Closed) => return Ok(()),
+                }
+            }
+            packet = audio_rx.recv(), if subs.contains("radio.audio") && deps.audio_enabled => {
+                match packet {
+                    Ok(packet) => {
+                        send!(Frame::EventAudioFrame(W::new(AudioFrameEvent {
+                            radio_id: "k3fall".into(),
+                            sequence: packet.seq,
+                            samples: base64::engine::general_purpose::STANDARD.encode(&packet.bytes),
+                            timestamp: now_iso8601(),
+                        })));
+                    }
+                    Err(broadcast::error::RecvError::Lagged(_)) => {
+                        audio_rx = audio_rx.resubscribe();
                     }
                     Err(broadcast::error::RecvError::Closed) => return Ok(()),
                 }

@@ -81,3 +81,10 @@ baud = 115200
 enabled = true
 listen = "0.0.0.0:8474"
 name = "k3fall"
+
+# Rig audio from a USB capture device on the K3 line out (RemoteOp radio.audio).
+[audio]
+enabled = true
+device = "plughw:CARD=Device"
+sample_rate = 16000
+label = "K3 line"

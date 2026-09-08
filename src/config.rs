@@ -11,6 +11,8 @@ pub struct Config {
     pub power: PowerConfig,
     #[serde(default)]
     pub remoteop: RemoteOpConfig,
+    #[serde(default)]
+    pub audio: AudioConfig,
     pub sdr: SdrConfig,
     pub cat: CatConfig,
     pub dsp: DspConfig,
@@ -70,6 +72,7 @@ impl Config {
             spots: SpotsConfig::default(),
             power: PowerConfig::default(),
             remoteop: RemoteOpConfig::default(),
+            audio: AudioConfig::default(),
             sdr: SdrConfig {
                 driver: "file".to_string(),
                 file_path: None,
@@ -267,4 +270,41 @@ fn default_remoteop_name() -> String {
 
 fn default_remoteop_state_file() -> std::path::PathBuf {
     std::path::PathBuf::from("/var/lib/k3fall/paired.json")
+}
+
+/// Rig audio capture (USB sound device on the K3 line out).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AudioConfig {
+    /// Off by default: the ALSA device name is hardware-specific.
+    #[serde(default)]
+    pub enabled: bool,
+    #[serde(default = "default_audio_device")]
+    pub device: String,
+    #[serde(default = "default_audio_rate")]
+    pub sample_rate: u32,
+    #[serde(default = "default_audio_label")]
+    pub label: String,
+}
+
+impl Default for AudioConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            device: default_audio_device(),
+            sample_rate: default_audio_rate(),
+            label: default_audio_label(),
+        }
+    }
+}
+
+fn default_audio_device() -> String {
+    "plughw:CARD=Device".to_string()
+}
+
+fn default_audio_rate() -> u32 {
+    16_000
+}
+
+fn default_audio_label() -> String {
+    "K3 line".to_string()
 }

@@ -75,6 +75,10 @@ pub enum Frame {
     EventWaterfallLine(W<WaterfallLineEvent>),
     #[serde(rename = "eventWaterfallCleared")]
     EventWaterfallCleared(W<WaterfallClearedEvent>),
+    #[serde(rename = "eventAudioFormat")]
+    EventAudioFormat(W<AudioFormatEvent>),
+    #[serde(rename = "eventAudioFrame")]
+    EventAudioFrame(W<AudioFrameEvent>),
     #[serde(rename = "ack")]
     Ack(W<Ack>),
     #[serde(rename = "errorFrame")]
@@ -279,6 +283,33 @@ pub struct WaterfallLineEvent {
 pub struct WaterfallClearedEvent {
     #[serde(rename = "radioID")]
     pub radio_id: String,
+    pub timestamp: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct AudioFormatEvent {
+    #[serde(rename = "radioID")]
+    pub radio_id: String,
+    pub source_label: String,
+    /// "pcm_s16le" | "opus"
+    pub codec: String,
+    pub sample_rate: i64,
+    pub channels: i64,
+    pub bits_per_sample: i64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub frames_per_packet: Option<i64>,
+    pub timestamp: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct AudioFrameEvent {
+    #[serde(rename = "radioID")]
+    pub radio_id: String,
+    pub sequence: u32,
+    /// base64 S16LE mono PCM (or codec packets per the announced format)
+    pub samples: String,
     pub timestamp: String,
 }
 

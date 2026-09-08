@@ -92,6 +92,11 @@ async fn main() {
         });
     }
 
+    let (audio_tx, _audio_rx) = tokio::sync::broadcast::channel::<k3fall::audio::AudioPacket>(64);
+    if cfg.audio.enabled {
+        k3fall::audio::spawn_capture(cfg.audio.clone(), audio_tx.clone());
+    }
+
     let remote_state = remoteop::RemoteState::load(cfg.remoteop.state_file.clone());
     if cfg.remoteop.enabled {
         let deps = std::sync::Arc::new(remoteop::Deps {
@@ -102,6 +107,8 @@ async fn main() {
             tune: tune_tx.clone(),
             cat_raw: cat_raw_tx.clone(),
             state: remote_state.clone(),
+            audio: audio_tx.clone(),
+            audio_enabled: cfg.audio.enabled,
         });
         tokio::spawn(remoteop::run_server(cfg.remoteop.listen.clone(), deps));
     }

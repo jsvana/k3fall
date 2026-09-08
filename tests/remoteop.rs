@@ -39,6 +39,8 @@ async fn pairing_handshake_and_tune() {
         tune: tune_tx,
         cat_raw: cat_raw_tx,
         state,
+        audio: tokio::sync::broadcast::channel(4).0,
+        audio_enabled: false,
     });
     tokio::spawn(remoteop::run_server_on(listener, deps));
     let _keep_rig = rig_tx;
