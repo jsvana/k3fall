@@ -7,6 +7,8 @@ use std::path::PathBuf;
 pub struct Config {
     #[serde(default)]
     pub spots: SpotsConfig,
+    #[serde(default)]
+    pub power: PowerConfig,
     pub sdr: SdrConfig,
     pub cat: CatConfig,
     pub dsp: DspConfig,
@@ -64,6 +66,7 @@ impl Config {
     pub fn default_dev() -> Config {
         Config {
             spots: SpotsConfig::default(),
+            power: PowerConfig::default(),
             sdr: SdrConfig {
                 driver: "file".to_string(),
                 file_path: None,
@@ -208,4 +211,11 @@ fn default_spots_enabled() -> bool {
 
 fn default_spots_poll_secs() -> u64 {
     30
+}
+
+/// Remote power control endpoint (k3pwr ESP32). None disables the feature.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct PowerConfig {
+    #[serde(default)]
+    pub url: Option<String>,
 }

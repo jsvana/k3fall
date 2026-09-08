@@ -70,3 +70,7 @@ name = "6m"
 low_hz  = 50_000_000
 high_hz = 54_000_000
 direction = 1
+
+# Remote power control (k3pwr ESP32 on the LAN). Comment out to disable.
+[power]
+url = "http://k3pwr.local"

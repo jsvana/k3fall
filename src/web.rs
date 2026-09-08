@@ -485,6 +485,30 @@ async fn handle_client_text(
                 "display message accepted and ignored (server-side ref/range not applied in v1)"
             );
         }
+        Ok(ClientMsg::Power { on }) => {
+            let Some(url) = state.cfg.power.url.clone() else {
+                let _ = send_json(
+                    sender,
+                    &ServerMsg::Error {
+                        message: "power control not configured ([power] url)".to_string(),
+                    },
+                )
+                .await;
+                return;
+            };
+            let result = relay_power(&url, on).await;
+            if let Err(err) = &result {
+                tracing::warn!(?err, "power relay failed");
+            }
+            let _ = send_json(
+                sender,
+                &ServerMsg::Power {
+                    on,
+                    ok: result.is_ok(),
+                },
+            )
+            .await;
+        }
         Err(err) => {
             let _ = send_json(
                 sender,
@@ -495,4 +519,19 @@ async fn handle_client_text(
             .await;
         }
     }
+}
+
+/// Forward a power request to the k3pwr ESP32 endpoint.
+async fn relay_power(base_url: &str, on: bool) -> anyhow::Result<()> {
+    let url = format!("{}/power", base_url.trim_end_matches('/'));
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(5))
+        .build()?;
+    client
+        .post(&url)
+        .json(&serde_json::json!({ "on": on }))
+        .send()
+        .await?
+        .error_for_status()?;
+    Ok(())
 }

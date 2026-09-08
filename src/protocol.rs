@@ -66,6 +66,9 @@ pub enum ClientMsg {
         ref_level_db: f32,
         range_db: f32,
     },
+    Power {
+        on: bool,
+    },
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
@@ -92,6 +95,10 @@ pub enum ServerMsg {
     },
     Spots {
         spots: Vec<Spot>,
+    },
+    Power {
+        on: bool,
+        ok: bool,
     },
 }
 

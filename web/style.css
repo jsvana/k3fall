@@ -105,3 +105,8 @@ body.disconnected .topbar .tele { opacity: 0.5; }
 .smark.pota { background: var(--pota, oklch(0.73 0.13 150)); }
 .smark.stale { opacity: 0.45; }
 .smark:hover { filter: brightness(1.15); }
+
+/* --- power button --- */
+button.chip.pwr { background: none; cursor: pointer; font: inherit; }
+button.chip.pwr.on { border-color: var(--accent-dim, oklch(0.5 0.1 55)); color: var(--accent, oklch(0.72 0.16 55)); }
+button.chip.pwr.pending { opacity: 0.5; }

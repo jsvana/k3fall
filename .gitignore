@@ -2,3 +2,5 @@
 config.toml
 /image/*.img
 /image/*.img.xz
+/firmware/k3pwr/target/
+/firmware/k3pwr/.embuild/

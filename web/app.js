@@ -293,6 +293,13 @@
 
   let spots = [];
   const spotLayer = document.getElementById('spotlayer');
+  let powerOn = false;
+  const btnPwr = document.getElementById('btn-pwr');
+  btnPwr.addEventListener('click', () => {
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    btnPwr.classList.add('pending');
+    ws.send(JSON.stringify({ type: 'power', on: !powerOn }));
+  });
 
   function renderSpots() {
     spotLayer.textContent = '';
@@ -356,6 +363,11 @@
     else if (msg.type === 'rig') handleRig(msg);
     else if (msg.type === 'error') showBanner(msg.message);
     else if (msg.type === 'spots') { spots = msg.spots || []; renderSpots(); }
+    else if (msg.type === 'power') {
+      btnPwr.classList.remove('pending');
+      if (msg.ok) { powerOn = msg.on; btnPwr.classList.toggle('on', powerOn); }
+      else showBanner('power command failed');
+    }
   }
 
   function handleRowFrame(buf) {
