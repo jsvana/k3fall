@@ -71,6 +71,8 @@ pub enum Frame {
     EventActiveSession(W<ActiveSessionEvent>),
     #[serde(rename = "eventQueriesList")]
     EventQueriesList(W<QueriesListEvent>),
+    #[serde(rename = "commandSetWaterfallView")]
+    CommandSetWaterfallView(W<SetWaterfallViewCommand>),
     #[serde(rename = "eventWaterfallLine")]
     EventWaterfallLine(W<WaterfallLineEvent>),
     #[serde(rename = "eventWaterfallCleared")]
@@ -261,6 +263,15 @@ pub struct ActiveSessionEvent {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct QueriesListEvent {
     pub queries: Vec<serde_json::Value>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct SetWaterfallViewCommand {
+    #[serde(rename = "requestID")]
+    pub request_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub span_hz: Option<u64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -483,6 +494,24 @@ mod tests {
         assert_matches_golden(
             &frame,
             r#"{"eventSpot":{"_0":{"spot":{"needed":false,"source":"RBN","spottedAt":"2023-11-14T22:13:20.500Z","band":"20m","id":"s1","workedBefore":false,"callsign":"F6HKA","snr":22,"freqHz":14008100,"mode":"CW"}}}}"#,
+        );
+    }
+
+    #[test]
+    fn set_waterfall_view_matches_swift() {
+        assert_matches_golden(
+            &Frame::CommandSetWaterfallView(W::new(SetWaterfallViewCommand {
+                request_id: "11111111-2222-3333-4444-555555555555".into(),
+                span_hz: Some(25_000),
+            })),
+            r#"{"commandSetWaterfallView":{"_0":{"spanHz":25000,"requestID":"11111111-2222-3333-4444-555555555555"}}}"#,
+        );
+        assert_matches_golden(
+            &Frame::CommandSetWaterfallView(W::new(SetWaterfallViewCommand {
+                request_id: "11111111-2222-3333-4444-555555555555".into(),
+                span_hz: None,
+            })),
+            r#"{"commandSetWaterfallView":{"_0":{"requestID":"11111111-2222-3333-4444-555555555555"}}}"#,
         );
     }
 

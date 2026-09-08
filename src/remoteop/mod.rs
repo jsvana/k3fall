@@ -219,6 +219,8 @@ async fn handle_conn(sock: tokio::net::TcpStream, deps: Arc<Deps>) -> anyhow::Re
     let mut spots_rx = deps.spots.clone();
     let mut sent_spot_ids: HashSet<String> = HashSet::new();
     let mut last_waterfall = Instant::now() - WATERFALL_FPS_INTERVAL;
+    // Client-requested waterfall span (None = full capture span).
+    let mut remote_span_hz: Option<u64> = None;
 
     macro_rules! send {
         ($frame:expr) => {{
@@ -342,6 +344,25 @@ async fn handle_conn(sock: tokio::net::TcpStream, deps: Arc<Deps>) -> anyhow::Re
                     Frame::Unsubscribe(w) => {
                         subs.remove(&w.inner.topic);
                     }
+                    Frame::CommandSetWaterfallView(w) => {
+                        let cmd = w.inner;
+                        let ok = authed;
+                        if ok {
+                            let sample_rate = u64::from(deps.cfg.sdr.sample_rate);
+                            let bin_hz =
+                                deps.cfg.sdr.sample_rate as f64 / deps.cfg.dsp.fft_size as f64;
+                            let min_span = (bin_hz * 128.0) as u64;
+                            remote_span_hz = cmd
+                                .span_hz
+                                .map(|hz| hz.clamp(min_span.max(1), sample_rate))
+                                .filter(|hz| *hz < sample_rate);
+                        }
+                        send!(Frame::Ack(W::new(Ack {
+                            request_id: cmd.request_id,
+                            success: ok,
+                            detail: (!ok).then(|| "not authenticated".to_string()),
+                        })));
+                    }
                     Frame::CommandTune(w) => {
                         let cmd = w.inner;
                         let ok = authed
@@ -404,7 +425,16 @@ async fn handle_conn(sock: tokio::net::TcpStream, deps: Arc<Deps>) -> anyhow::Re
                         } else {
                             deps.cfg.sdr.center_hz
                         };
-                        let mut shaped = shape_row(&row.bins, 0, row.bins.len(), REMOTE_WATERFALL_BINS);
+                        let full_span = u64::from(deps.cfg.sdr.sample_rate);
+                        let span = remote_span_hz.unwrap_or(full_span).min(full_span);
+                        let total = row.bins.len();
+                        // Centered slice of the full-resolution row (the
+                        // capture is VFO-centered via the IF tap).
+                        let window = ((span as f64 / full_span as f64) * total as f64) as usize;
+                        let window = window.clamp(8, total);
+                        let start = (total - window) / 2;
+                        let mut shaped =
+                            shape_row(&row.bins, start, start + window, REMOTE_WATERFALL_BINS);
                         if direction_for(&deps.cfg.bands, center) == -1 {
                             shaped.reverse();
                         }
@@ -412,7 +442,7 @@ async fn handle_conn(sock: tokio::net::TcpStream, deps: Arc<Deps>) -> anyhow::Re
                             radio_id: "k3fall".into(),
                             source: "k3fall".into(),
                             center_hz: center,
-                            span_hz: u64::from(deps.cfg.sdr.sample_rate),
+                            span_hz: span,
                             bin_count: shaped.len() as u16,
                             bins: base64::engine::general_purpose::STANDARD.encode(&shaped),
                             sequence: u64::from(row.seq),
