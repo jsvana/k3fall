@@ -44,7 +44,7 @@ direction = 1
 name = "20m"
 low_hz  = 14_000_000
 high_hz = 14_350_000
-direction = 1
+direction = -1
 [[bands]]
 name = "17m"
 low_hz  = 18_068_000

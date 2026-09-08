@@ -109,20 +109,22 @@
     const hz = lastFrame ? lastFrame.centerHz : rig ? rig.vfo_a_hz : 0;
     return Math.floor(hz / 1e6);
   }
-  function currentDir() {
-    if (!lastFrame) return 1;
-    const baseDir = lastFrame.flags & FLAG_INVERTED ? -1 : 1;
+  // True when the incoming row's bins run high->low (hardware-inverted IF
+  // spectrum, possibly corrected by the user's INV override). The row gets
+  // pixel-mirrored before painting, so on-screen RF ALWAYS increases
+  // left->right and every mapping below stays direction-free.
+  function rowReversed() {
+    if (!lastFrame) return false;
+    const hardwareInverted = (lastFrame.flags & FLAG_INVERTED) !== 0;
     const override = invOverrides[currentBand()] === true;
-    return override ? -baseDir : baseDir;
+    return override ? !hardwareInverted : hardwareInverted;
   }
   function freqAt(xCss, cssWidth) {
     if (!lastFrame || cssWidth <= 0) return lastFrame ? lastFrame.centerHz : 0;
-    const dir = currentDir();
-    return lastFrame.centerHz + dir * (xCss / cssWidth - 0.5) * lastFrame.spanHz;
+    return lastFrame.centerHz + (xCss / cssWidth - 0.5) * lastFrame.spanHz;
   }
   function fracForFreq(freqHz) {
-    const dir = currentDir();
-    return 0.5 + (dir * (freqHz - lastFrame.centerHz)) / lastFrame.spanHz;
+    return 0.5 + (freqHz - lastFrame.centerHz) / lastFrame.spanHz;
   }
 
   function updateInvChipUI() {
@@ -166,12 +168,9 @@
     freqruler.innerHTML = '';
     if (!lastFrame) return;
     const { centerHz, spanHz: span } = lastFrame;
-    const dir = currentDir();
     const step = niceStep(span / 6);
-    const f0 = centerHz + dir * -0.5 * span;
-    const f1 = centerHz + dir * 0.5 * span;
-    const lo = Math.min(f0, f1);
-    const hi = Math.max(f0, f1);
+    const lo = centerHz - 0.5 * span;
+    const hi = centerHz + 0.5 * span;
     const first = Math.ceil(lo / step) * step;
     for (let f = first; f <= hi + 1e-6; f += step) {
       const frac = fracForFreq(f);
@@ -188,7 +187,7 @@
 
   function maybeRebuildRuler() {
     if (!lastFrame) return;
-    const key = `${lastFrame.centerHz}|${lastFrame.spanHz}|${lastFrame.flags}|${currentDir()}`;
+    const key = `${lastFrame.centerHz}|${lastFrame.spanHz}|${rowReversed()}`;
     if (key === lastRulerKey) return;
     lastRulerKey = key;
     buildRuler();
@@ -378,8 +377,9 @@
     const bins = dv.getUint16(16, true);
     const flags = dv.getUint8(18);
     if (buf.byteLength < 19 + bins) return;
-    const payload = new Uint8Array(buf, 19, bins);
+    let payload = new Uint8Array(buf, 19, bins);
     lastFrame = { centerHz, spanHz: spanHzHdr, flags };
+    if (rowReversed()) payload = payload.slice().reverse();
     paintRow(payload);
     updateVfoLine();
     maybeRebuildRuler();
@@ -420,7 +420,7 @@
     (e) => {
       e.preventDefault();
       if (!status) return;
-      const factor = e.deltaY > 0 ? 0.5 : 2;
+      const factor = e.deltaY < 0 ? 0.5 : 2;
       const minSpan = Math.max(1, status.bin_hz * 128);
       const maxSpan = status.sample_rate;
       const next = Math.min(maxSpan, Math.max(minSpan, Math.round(spanHz * factor)));

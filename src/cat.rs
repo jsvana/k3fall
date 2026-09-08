@@ -417,7 +417,7 @@ mod tests {
     #[test]
     fn direction_lookup() {
         let bands = crate::config::Config::default_dev().bands;
-        assert_eq!(direction_for(&bands, 14_032_500), 1);
+        assert_eq!(direction_for(&bands, 14_032_500), -1);
         assert_eq!(direction_for(&bands, 7_030_000), -1);
         assert_eq!(direction_for(&bands, 5_000_000), 1); // out of band → default
     }

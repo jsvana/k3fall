@@ -124,7 +124,7 @@ fn default_bands() -> Vec<BandConfig> {
             name: "20m".to_string(),
             low_hz: 14_000_000,
             high_hz: 14_350_000,
-            direction: 1,
+            direction: -1,
         },
         BandConfig {
             name: "17m".to_string(),
@@ -174,7 +174,7 @@ mod tests {
                 .find(|b| b.name == "20m")
                 .unwrap()
                 .direction,
-            1
+            -1
         );
     }
 
