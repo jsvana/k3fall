@@ -17,13 +17,14 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
 use esp_idf_svc::eventloop::EspSystemEventLoop;
-use esp_idf_svc::hal::gpio::{Output, PinDriver};
+use esp_idf_svc::hal::gpio::PinDriver;
 use esp_idf_svc::hal::peripherals::Peripherals;
+use esp_idf_svc::handle::RawHandle;
 use esp_idf_svc::http::server::{Configuration as HttpConfig, EspHttpServer};
 use esp_idf_svc::http::Method;
-use esp_idf_svc::io::{Read, Write};
+use esp_idf_svc::io::Write;
 use esp_idf_svc::mdns::EspMdns;
-use esp_idf_svc::netif::{EspNetif, NetifConfiguration, NetifStack};
+use esp_idf_svc::netif::{EspNetif, NetifConfiguration};
 use esp_idf_svc::sys::{
     esp, esp_eth_handle_t, esp_eth_new_netif_glue, esp_eth_start, esp_netif_attach,
     ethernet_init_all,
@@ -41,7 +42,7 @@ fn main() -> anyhow::Result<()> {
     // Power stage gate: low at boot = transistor off = radio line released.
     let mut power_pin = PinDriver::output(peripherals.pins.gpio4)?;
     power_pin.set_low()?;
-    let power_pin: Arc<Mutex<PinDriver<'static, _, Output>>> = Arc::new(Mutex::new(power_pin));
+    let power_pin = Arc::new(Mutex::new(power_pin));
     log::info!("power stage on GPIO4, boot state OFF");
 
     // Ethernet via the espressif/ethernet_init component (pins/PHY from
