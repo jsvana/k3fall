@@ -62,6 +62,10 @@ LIBS = [
     ("Transistor_FET", "Q_NMOS_GSD"),
     ("Connector", "DE15_Pins_HighDensity"),
     ("power", "PWR_FLAG"),
+    ("Power_Protection", "USBLC6-2P6"),
+    ("Device", "Polyfuse"),
+    ("Device", "D_Schottky"),
+    ("Device", "D_TVS"),
 ]
 
 # Prefix parent symbol names with lib name (KiCad embeds as "LIB:NAME").
@@ -103,7 +107,7 @@ def place(lib, name, ref, value, netfn):
     global SLOT
     col, row = SLOT % 9, SLOT // 9
     x = 30.48 + col * 43.18
-    y = 88.9 + row * 114.3
+    y = 78.74 + row * 95.25
     placements.append((lib, name, ref, value, x, y, netfn))
     SLOT += 1
 
@@ -113,7 +117,7 @@ def netfn_fixed(d):
     return lambda num, pname: d.get(num)
 
 place("Connector_Generic", "Conn_01x05", "J1", "USB_pigtail",
-      netfn_fixed({"1": "VBUS", "2": "UD-", "3": "UD+", "4": "GND", "5": "GND"}))
+      netfn_fixed({"1": "VBUS_IN", "2": "UD-", "3": "UD+", "4": "GND", "5": "GND"}))
 place("Interface_USB", "CH340C", "U1", "CH340C",
       lambda num, pname: ch340_net(pname))
 place("Device", "R", "R1", "4.7k", netfn_fixed({"1": "DTR_N", "2": "Q1B"}))
@@ -131,7 +135,13 @@ place("Device", "C", "C2", "100n", netfn_fixed({"1": "V3", "2": "GND"}))
 place("Device", "R", "R5", "1k", netfn_fixed({"1": "VBUS", "2": "LED_A"}))
 place("Device", "LED", "D1", "green", netfn_fixed({"1": "GND", "2": "LED_A"}))
 place("Connector", "DE15_Pins_HighDensity", "J2", "K3_ACC",
-      netfn_fixed({"5": "GND", "8": "PWR_SINK"}))
+      netfn_fixed({"5": "GND", "8": "ACC_PWR"}))
+place("Device", "Polyfuse", "F1", "500mA", netfn_fixed({"1": "VBUS_IN", "2": "VBUS_F"}))
+place("Device", "D_Schottky", "D2", "SS14", netfn_fixed({"2": "VBUS_F", "1": "VBUS"}))
+place("Power_Protection", "USBLC6-2P6", "U2", "USBLC6-2SC6",
+      lambda num, pname: {"1": "UD-", "6": "UD-", "3": "UD+", "4": "UD+", "5": "VBUS", "2": "GND"}.get(num))
+place("Device", "D_TVS", "D3", "SMAJ15A", netfn_fixed({"1": "ACC_PWR", "2": "GND"}))
+place("Device", "R", "R6", "100R", netfn_fixed({"1": "PWR_SINK", "2": "ACC_PWR"}))
 place("power", "PWR_FLAG", "#FLG01", "PWR_FLAG", netfn_fixed({"1": "VBUS"}))
 place("power", "PWR_FLAG", "#FLG02", "PWR_FLAG", netfn_fixed({"1": "GND"}))
 
