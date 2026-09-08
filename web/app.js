@@ -296,6 +296,11 @@
   const zoomWin = document.getElementById('zoomwin');
   let powerOn = false;
   const btnPwr = document.getElementById('btn-pwr');
+  const btnPair = document.getElementById('btn-pair');
+  btnPair.addEventListener('click', () => {
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    ws.send(JSON.stringify({ type: 'pair_start' }));
+  });
   btnPwr.addEventListener('click', () => {
     if (!ws || ws.readyState !== WebSocket.OPEN) return;
     btnPwr.classList.add('pending');
@@ -364,6 +369,9 @@
     else if (msg.type === 'rig') handleRig(msg);
     else if (msg.type === 'error') showBanner(msg.message);
     else if (msg.type === 'spots') { spots = msg.spots || []; renderSpots(); }
+    else if (msg.type === 'pair_code') {
+      showBanner(`pairing code: ${msg.code} · valid 2 minutes · enter in Carrier Wave`, 120000);
+    }
     else if (msg.type === 'power') {
       btnPwr.classList.remove('pending');
       if (msg.ok) { powerOn = msg.on; btnPwr.classList.toggle('on', powerOn); }
@@ -492,13 +500,13 @@
   });
 
   // ---- banner ----
-  function showBanner(message) {
+  function showBanner(message, holdMs = 4000) {
     bannerEl.textContent = message;
     bannerEl.hidden = false;
     clearTimeout(bannerTimer);
     bannerTimer = setTimeout(() => {
       bannerEl.hidden = true;
-    }, 4000);
+    }, holdMs);
   }
 
   // ---- clock ----

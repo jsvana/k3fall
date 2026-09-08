@@ -55,6 +55,9 @@ async fn websocket_streams_status_then_shaped_row() {
         cfg: cfg.clone(),
         sdr_ok_rx,
         spots_rx,
+        remote: k3fall::remoteop::RemoteState::load(
+            std::env::temp_dir().join("k3fall-test-paired.json"),
+        ),
     };
 
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();

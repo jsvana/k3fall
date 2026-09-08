@@ -192,12 +192,23 @@ async fn write_blocking(
 /// dropped rather than queued — they don't shorten or interrupt the backoff.
 /// Returns `true` if `tune_rx`'s sender was dropped, meaning the caller
 /// should shut `run_cat_task` down entirely instead of retrying.
-async fn backoff_or_shutdown(dur: Duration, tune_rx: &mut mpsc::Receiver<u64>) -> bool {
+async fn backoff_or_shutdown(
+    dur: Duration,
+    tune_rx: &mut mpsc::Receiver<u64>,
+    raw_rx: &mut mpsc::Receiver<String>,
+    raw_closed: &mut bool,
+) -> bool {
     let sleep = tokio::time::sleep(dur);
     tokio::pin!(sleep);
     loop {
         tokio::select! {
             _ = &mut sleep => return false,
+            raw = raw_rx.recv(), if !*raw_closed => {
+                match raw {
+                    Some(_) => tracing::debug!("dropping raw CAT command while disconnected"),
+                    None => *raw_closed = true,
+                }
+            }
             msg = tune_rx.recv() => {
                 match msg {
                     Some(freq_hz) => {
@@ -225,7 +236,9 @@ pub async fn run_cat_task(
     cfg: CatConfig,
     state_tx: watch::Sender<RigState>,
     mut tune_rx: mpsc::Receiver<u64>,
+    mut raw_rx: mpsc::Receiver<String>,
 ) {
+    let mut raw_closed = false;
     loop {
         let port = match serialport::new(&cfg.device, cfg.baud)
             .timeout(READ_TIMEOUT)
@@ -235,7 +248,14 @@ pub async fn run_cat_task(
             Err(err) => {
                 tracing::warn!(device = %cfg.device, error = %err, "failed to open CAT serial port");
                 state_tx.send_modify(|s| s.connected = false);
-                if backoff_or_shutdown(RECONNECT_BACKOFF, &mut tune_rx).await {
+                if backoff_or_shutdown(
+                    RECONNECT_BACKOFF,
+                    &mut tune_rx,
+                    &mut raw_rx,
+                    &mut raw_closed,
+                )
+                .await
+                {
                     return;
                 }
                 continue;
@@ -248,7 +268,14 @@ pub async fn run_cat_task(
             Err(err) => {
                 tracing::warn!(error = %err, "failed to clone CAT serial handle");
                 state_tx.send_modify(|s| s.connected = false);
-                if backoff_or_shutdown(RECONNECT_BACKOFF, &mut tune_rx).await {
+                if backoff_or_shutdown(
+                    RECONNECT_BACKOFF,
+                    &mut tune_rx,
+                    &mut raw_rx,
+                    &mut raw_closed,
+                )
+                .await
+                {
                     return;
                 }
                 continue;
@@ -260,7 +287,14 @@ pub async fn run_cat_task(
         if let Err(err) = write_blocking(&mut writer, b"AI2;FA;FB;MD;".to_vec()).await {
             tracing::warn!(error = %err, "failed to write CAT init command");
             state_tx.send_modify(|s| s.connected = false);
-            if backoff_or_shutdown(RECONNECT_BACKOFF, &mut tune_rx).await {
+            if backoff_or_shutdown(
+                RECONNECT_BACKOFF,
+                &mut tune_rx,
+                &mut raw_rx,
+                &mut raw_closed,
+            )
+            .await
+            {
                 return;
             }
             continue;
@@ -351,6 +385,20 @@ pub async fn run_cat_task(
                         }
                     }
                 }
+                raw = raw_rx.recv(), if !raw_closed => {
+                    match raw {
+                        Some(cmd) => {
+                            if let Err(err) = write_blocking(&mut writer, cmd.into_bytes()).await {
+                                break 'session format!("write error: {err}");
+                            }
+                        }
+                        None => {
+                            // RemoteOp sender gone; the tune channel still
+                            // governs task lifetime, so just stop selecting.
+                            raw_closed = true;
+                        }
+                    }
+                }
                 _ = keepalive.tick() => {
                     if let Err(err) = write_blocking(&mut writer, b"FA;".to_vec()).await {
                         break 'session format!("keepalive write error: {err}");
@@ -366,7 +414,14 @@ pub async fn run_cat_task(
 
         tracing::warn!(reason = %disconnect_reason, "CAT serial disconnected");
         state_tx.send_modify(|s| s.connected = false);
-        if backoff_or_shutdown(RECONNECT_BACKOFF, &mut tune_rx).await {
+        if backoff_or_shutdown(
+            RECONNECT_BACKOFF,
+            &mut tune_rx,
+            &mut raw_rx,
+            &mut raw_closed,
+        )
+        .await
+        {
             return;
         }
     }

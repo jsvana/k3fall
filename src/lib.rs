@@ -3,6 +3,7 @@ pub mod config;
 pub mod dsp;
 pub mod iq;
 pub mod protocol;
+pub mod remoteop;
 pub mod shaping;
 #[cfg(feature = "soapy")]
 pub mod soapy;

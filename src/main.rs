@@ -2,7 +2,7 @@ use std::path::Path;
 use std::sync::Arc;
 
 use anyhow::Context;
-use k3fall::{cat, config::Config, dsp, iq, spots, web};
+use k3fall::{cat, config::Config, dsp, iq, remoteop, spots, web};
 
 /// Called by the DSP thread's reconnect loop to (re)acquire an `IqSource`.
 /// Invoked once at startup and again after every stream/read failure, so it
@@ -62,10 +62,11 @@ async fn main() {
 
     let (rig_tx, rig_rx) = tokio::sync::watch::channel(cat::RigState::default());
     let (tune_tx, tune_rx) = tokio::sync::mpsc::channel::<u64>(32);
+    let (cat_raw_tx, cat_raw_rx) = tokio::sync::mpsc::channel::<String>(64);
 
     if cfg.cat.enabled {
         let cat_cfg = cfg.cat.clone();
-        tokio::spawn(cat::run_cat_task(cat_cfg, rig_tx, tune_rx));
+        tokio::spawn(cat::run_cat_task(cat_cfg, rig_tx, tune_rx, cat_raw_rx));
     } else {
         // Keep the watch sender alive for the life of the program so
         // `rig_rx`'s `changed()` never observes a closed channel; nothing
@@ -91,6 +92,20 @@ async fn main() {
         });
     }
 
+    let remote_state = remoteop::RemoteState::load(cfg.remoteop.state_file.clone());
+    if cfg.remoteop.enabled {
+        let deps = std::sync::Arc::new(remoteop::Deps {
+            cfg: cfg.clone(),
+            rows: rows_tx.clone(),
+            rig: rig_rx.clone(),
+            spots: spots_rx.clone(),
+            tune: tune_tx.clone(),
+            cat_raw: cat_raw_tx.clone(),
+            state: remote_state.clone(),
+        });
+        tokio::spawn(remoteop::run_server(cfg.remoteop.listen.clone(), deps));
+    }
+
     let state = web::AppState {
         rows: rows_tx,
         rig: rig_rx,
@@ -98,6 +113,7 @@ async fn main() {
         cfg: cfg.clone(),
         sdr_ok_rx,
         spots_rx,
+        remote: remote_state,
     };
 
     let app = web::router(state);

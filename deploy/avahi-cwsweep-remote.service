@@ -1,0 +1,11 @@
+<?xml version="1.0" standalone='no'?>
+<!DOCTYPE service-group SYSTEM "avahi-service.dtd">
+<!-- Advertises k3fall's native Carrier Wave RemoteOp server so the iOS app
+     can discover and pair with the Pi directly. -->
+<service-group>
+  <name replace-wildcards="no">k3fall</name>
+  <service>
+    <type>_cwsweep-remote._tcp</type>
+    <port>8474</port>
+  </service>
+</service-group>

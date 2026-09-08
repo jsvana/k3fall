@@ -69,6 +69,7 @@ pub enum ClientMsg {
     Power {
         on: bool,
     },
+    PairStart,
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
@@ -99,6 +100,9 @@ pub enum ServerMsg {
     Power {
         on: bool,
         ok: bool,
+    },
+    PairCode {
+        code: String,
     },
 }
 

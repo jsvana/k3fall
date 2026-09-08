@@ -75,3 +75,9 @@ direction = 1
 [power]
 device = "/dev/ttyACM0"
 baud = 115200
+
+# Native Carrier Wave RemoteOp server (pair the iOS app directly with the Pi).
+[remoteop]
+enabled = true
+listen = "0.0.0.0:8474"
+name = "k3fall"

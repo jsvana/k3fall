@@ -41,6 +41,8 @@ pub struct AppState {
     pub sdr_ok_rx: watch::Receiver<bool>,
     /// Latest merged enrichment spots (RBN/POTA) for the current band.
     pub spots_rx: watch::Receiver<Vec<Spot>>,
+    /// RemoteOp pairing/device registry (pairing codes come from the web UI).
+    pub remote: std::sync::Arc<crate::remoteop::RemoteState>,
 }
 
 pub fn router(state: AppState) -> Router {
@@ -493,6 +495,11 @@ async fn handle_client_text(
                 range_db,
                 "display message accepted and ignored (server-side ref/range not applied in v1)"
             );
+        }
+        Ok(ClientMsg::PairStart) => {
+            let code = state.remote.begin_pairing();
+            tracing::info!(code, "remoteop pairing code issued");
+            let _ = send_json(sender, &ServerMsg::PairCode { code }).await;
         }
         Ok(ClientMsg::Power { on }) => {
             let Some(device) = state.cfg.power.device.clone() else {

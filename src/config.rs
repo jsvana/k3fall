@@ -9,6 +9,8 @@ pub struct Config {
     pub spots: SpotsConfig,
     #[serde(default)]
     pub power: PowerConfig,
+    #[serde(default)]
+    pub remoteop: RemoteOpConfig,
     pub sdr: SdrConfig,
     pub cat: CatConfig,
     pub dsp: DspConfig,
@@ -67,6 +69,7 @@ impl Config {
         Config {
             spots: SpotsConfig::default(),
             power: PowerConfig::default(),
+            remoteop: RemoteOpConfig::default(),
             sdr: SdrConfig {
                 driver: "file".to_string(),
                 file_path: None,
@@ -224,4 +227,44 @@ pub struct PowerConfig {
 
 fn default_power_baud() -> u32 {
     115_200
+}
+
+/// Native Carrier Wave RemoteOp server (iOS "Field" pairing).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RemoteOpConfig {
+    #[serde(default = "default_remoteop_enabled")]
+    pub enabled: bool,
+    #[serde(default = "default_remoteop_listen")]
+    pub listen: String,
+    #[serde(default = "default_remoteop_name")]
+    pub name: String,
+    #[serde(default = "default_remoteop_state_file")]
+    pub state_file: std::path::PathBuf,
+}
+
+impl Default for RemoteOpConfig {
+    fn default() -> Self {
+        Self {
+            enabled: default_remoteop_enabled(),
+            listen: default_remoteop_listen(),
+            name: default_remoteop_name(),
+            state_file: default_remoteop_state_file(),
+        }
+    }
+}
+
+fn default_remoteop_enabled() -> bool {
+    true
+}
+
+fn default_remoteop_listen() -> String {
+    "0.0.0.0:8474".to_string()
+}
+
+fn default_remoteop_name() -> String {
+    "k3fall".to_string()
+}
+
+fn default_remoteop_state_file() -> std::path::PathBuf {
+    std::path::PathBuf::from("/var/lib/k3fall/paired.json")
 }
