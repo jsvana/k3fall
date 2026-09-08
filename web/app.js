@@ -310,7 +310,7 @@
         extra.textContent = s.snr_db + 'dB';
         el.appendChild(extra);
       }
-      el.title = s.callsign + ' \u00b7 ' + formatFreq(s.freq_hz) +
+      el.title = s.callsign + ' \u00b7 ' + formatFreqText(s.freq_hz) +
         (s.label ? ' \u00b7 ' + s.label : '') + ' \u00b7 ' + Math.round(s.age_s / 60) + 'm ago';
       el.addEventListener('click', (ev) => {
         ev.stopPropagation();
