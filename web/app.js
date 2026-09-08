@@ -287,11 +287,13 @@
     ws.send(JSON.stringify({ type: 'view', width, span_hz: Math.round(spanHz), center_offset_hz: 0 }));
   }
   function updateSpanTele() {
+    if (zoomWin) updateZoombar();
     teleSpan.textContent = (spanHz / 1000).toFixed(1);
   }
 
   let spots = [];
   const spotLayer = document.getElementById('spotlayer');
+  const zoomWin = document.getElementById('zoomwin');
   let powerOn = false;
   const btnPwr = document.getElementById('btn-pwr');
   btnPwr.addEventListener('click', () => {
@@ -415,19 +417,40 @@
   }
 
   // ---- interaction: zoom / tune / hover ----
+  function updateZoombar() {
+    if (!status) return;
+    const frac = Math.min(1, spanHz / status.sample_rate);
+    zoomWin.style.width = `${(frac * 100).toFixed(2)}%`;
+    zoomWin.style.left = `${((1 - frac) * 50).toFixed(2)}%`;
+  }
+
+  let viewSendTimer = null;
+  function scheduleSendView() {
+    if (viewSendTimer) return;
+    viewSendTimer = setTimeout(() => {
+      viewSendTimer = null;
+      sendView();
+    }, 80);
+  }
+
   scopeEl.addEventListener(
     'wheel',
     (e) => {
       e.preventDefault();
       if (!status) return;
-      const factor = e.deltaY < 0 ? 0.5 : 2;
+      // Proportional zoom: ~300px of wheel travel per octave, so trackpads
+      // glide instead of slamming between the limits.
+      const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 100 : 1;
+      let factor = Math.pow(2, (e.deltaY * unit) / 300);
+      factor = Math.min(2, Math.max(0.5, factor));
       const minSpan = Math.max(1, status.bin_hz * 128);
       const maxSpan = status.sample_rate;
       const next = Math.min(maxSpan, Math.max(minSpan, Math.round(spanHz * factor)));
       if (next !== spanHz) {
         spanHz = next;
         updateSpanTele();
-        sendView();
+        updateZoombar();
+        scheduleSendView();
       }
     },
     { passive: false },

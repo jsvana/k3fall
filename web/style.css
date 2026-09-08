@@ -110,3 +110,10 @@ body.disconnected .topbar .tele { opacity: 0.5; }
 button.chip.pwr { background: none; cursor: pointer; font: inherit; }
 button.chip.pwr.on { border-color: var(--accent-dim, oklch(0.5 0.1 55)); color: var(--accent, oklch(0.72 0.16 55)); }
 button.chip.pwr.pending { opacity: 0.5; }
+
+/* --- zoom indicator: visible window within the full 250 kHz capture --- */
+.zoombar { position: absolute; left: 0; right: 0; bottom: 22px; height: 5px; z-index: 5;
+           background: color-mix(in oklab, var(--line, oklch(0.28 0.01 60)) 55%, transparent); }
+.zoombar .zoomwin { position: absolute; top: 0; bottom: 0;
+           background: var(--accent, oklch(0.72 0.16 55)); border-radius: 2px;
+           min-width: 6px; transition: left 0.1s ease-out, width 0.1s ease-out; }
