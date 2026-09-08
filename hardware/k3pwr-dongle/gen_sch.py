@@ -103,12 +103,12 @@ def ch340_net(pin_name):
 
 placements = []  # (lib,name,ref,value,x,y, netmap: pin_number->net or None=NC)
 SLOT = 0
-def place(lib, name, ref, value, netfn, note=None):
+def place(lib, name, ref, value, netfn, note=None, note_dy=11.43):
     global SLOT
     col, row = SLOT % 9, SLOT // 9
     x = 30.48 + col * 43.18
     y = 78.74 + row * 95.25
-    placements.append((lib, name, ref, value, x, y, netfn, note))
+    placements.append((lib, name, ref, value, x, y, netfn, note, note_dy))
     SLOT += 1
 
 sym_pins = {f"{lib}:{name}": pins(extract(*PIN_SOURCE[f"{lib}:{name}"])) for lib, name in LIBS}
@@ -117,42 +117,58 @@ def netfn_fixed(d):
     return lambda num, pname: d.get(num)
 
 place("Connector_Generic", "Conn_01x05", "J1", "USB_pigtail",
-      netfn_fixed({"1": "VBUS_IN", "2": "UD-", "3": "UD+", "4": "GND", "5": "GND"}))
+      netfn_fixed({"1": "VBUS_IN", "2": "UD-", "3": "UD+", "4": "GND", "5": "GND"}),
+      note="solder pads for USB-A pigtail to the Pi\\n(VBUS, D-, D+, GND, shield->GND)")
 place("Interface_USB", "CH340C", "U1", "CH340C",
-      lambda num, pname: ch340_net(pname))
-place("Device", "R", "R1", "4.7k", netfn_fixed({"1": "DTR_N", "2": "Q1B"}))
-place("Device", "R", "R4", "10k", netfn_fixed({"1": "VBUS", "2": "Q1B"}))
+      lambda num, pname: ch340_net(pname),
+      note="USB-serial bridge; only DTR# is used\\nTXD->RXD loopback lets the server\\nprobe that the dongle is present", note_dy=20.32)
+place("Device", "R", "R1", "4.7k", netfn_fixed({"1": "DTR_N", "2": "Q1B"}),
+      note="Q1 base current limit")
+place("Device", "R", "R4", "10k", netfn_fixed({"1": "VBUS", "2": "Q1B"}),
+      note="holds Q1 off while DTR# floats\\nduring USB enumeration")
 place("Transistor_BJT", "Q_PNP_BEC", "Q1", "MMBT3906",
-      lambda num, pname: {"B": "Q1B", "E": "VBUS", "C": "GATE_PRE"}.get(pname))
-place("Device", "R", "R2", "33k", netfn_fixed({"1": "GATE_PRE", "2": "GATE"}))
+      lambda num, pname: {"B": "Q1B", "E": "VBUS", "C": "GATE_PRE"}.get(pname),
+      note="polarity inverter: DTR# is active-low,\\nidles high -> idle/unplugged = radio OFF")
+place("Device", "R", "R2", "33k", netfn_fixed({"1": "GATE_PRE", "2": "GATE"}),
+      note="with C4: ~0.3s turn-on delay")
 place("Device", "C_Polarized", "C4", "10u", netfn_fixed({"1": "GATE", "2": "GND"}),
       note="gate glitch filter: with R2/R3 swallows\\nDTR pulses from USB enumeration\\n(~0.3s on, ~1s release)")
-place("Device", "R", "R3", "100k", netfn_fixed({"1": "GATE", "2": "GND"}))
+place("Device", "R", "R3", "100k", netfn_fixed({"1": "GATE", "2": "GND"}),
+      note="gate pulldown: guarantees OFF when\\nunpowered; ~1s release with C4")
 place("Transistor_FET", "Q_NMOS_GSD", "Q2", "2N7002",
-      lambda num, pname: {"G": "GATE", "S": "GND", "D": "PWR_SINK"}.get(pname))
+      lambda num, pname: {"G": "GATE", "S": "GND", "D": "PWR_SINK"}.get(pname),
+      note="open-collector sink for ACC pin 8:\\nonly ever pulls low, never sources")
 place("Device", "C", "C1", "100n", netfn_fixed({"1": "VBUS", "2": "GND"}),
       note="CH340C VCC decoupling\\n(place at pin 16)")
 place("Device", "C_Polarized", "C3", "4.7u", netfn_fixed({"1": "VBUS", "2": "GND"}),
       note="VBUS bulk reservoir\\nfor pigtail inductance")
 place("Device", "C", "C2", "100n", netfn_fixed({"1": "V3", "2": "GND"}),
       note="V3 internal-regulator bypass\\n(required by CH340 datasheet)")
-place("Device", "R", "R5", "1k", netfn_fixed({"1": "VBUS", "2": "LED_A"}))
-place("Device", "LED", "D1", "green", netfn_fixed({"1": "GND", "2": "LED_A"}))
+place("Device", "R", "R5", "1k", netfn_fixed({"1": "VBUS", "2": "LED_A"}),
+      note="power LED current limit (~3mA)")
+place("Device", "LED", "D1", "green", netfn_fixed({"1": "GND", "2": "LED_A"}),
+      note="USB power indicator")
 place("Connector", "DE15_Pins_HighDensity", "J2", "K3_ACC",
-      netfn_fixed({"5": "GND", "8": "ACC_PWR"}))
-place("Device", "Polyfuse", "F1", "500mA", netfn_fixed({"1": "VBUS_IN", "2": "VBUS_F"}))
-place("Device", "D_Schottky", "D2", "SS14", netfn_fixed({"2": "VBUS_F", "1": "VBUS"}))
+      netfn_fixed({"5": "GND", "8": "ACC_PWR"}),
+      note="K3 ACC: pin 8 = PWR ON (sink = on),\\npin 5 = GND, all others unused", note_dy=25.4)
+place("Device", "Polyfuse", "F1", "500mA", netfn_fixed({"1": "VBUS_IN", "2": "VBUS_F"}),
+      note="protects the Pi USB port from\\nboard or hood-wiring faults")
+place("Device", "D_Schottky", "D2", "SS14", netfn_fixed({"2": "VBUS_F", "1": "VBUS"}),
+      note="reverse-polarity guard for a\\nmiswired pigtail (~0.3V drop)")
 place("Power_Protection", "USBLC6-2P6", "U2", "USBLC6-2SC6",
-      lambda num, pname: {"1": "UD-", "6": "UD-", "3": "UD+", "4": "UD+", "5": "VBUS", "2": "GND"}.get(num))
-place("Device", "D_TVS", "D3", "SMAJ15A", netfn_fixed({"1": "ACC_PWR", "2": "GND"}))
-place("Device", "R", "R6", "100R", netfn_fixed({"1": "PWR_SINK", "2": "ACC_PWR"}))
+      lambda num, pname: {"1": "UD-", "6": "UD-", "3": "UD+", "4": "UD+", "5": "VBUS", "2": "GND"}.get(num),
+      note="IEC 61000-4-2 ESD clamp\\nfor D+/D-/VBUS")
+place("Device", "D_TVS", "D3", "SMAJ15A", netfn_fixed({"1": "ACC_PWR", "2": "GND"}),
+      note="clamps ESD/spikes on the ACC line;\\nmount at connector, cathode to line")
+place("Device", "R", "R6", "100R", netfn_fixed({"1": "PWR_SINK", "2": "ACC_PWR"}),
+      note="limits fault current into ACC wiring;\\nnegligible vs the K3 pull-up")
 place("power", "PWR_FLAG", "#FLG01", "PWR_FLAG", netfn_fixed({"1": "VBUS"}))
 place("power", "PWR_FLAG", "#FLG02", "PWR_FLAG", netfn_fixed({"1": "GND"}))
 
 body = []
 labels = []
 noconnects = []
-for lib, name, ref, value, px, py, netfn, note in placements:
+for lib, name, ref, value, px, py, netfn, note, note_dy in placements:
     su = U()
     body.append(f'''  (symbol (lib_id "{lib}:{name}") (at {px} {py} 0) (unit 1)
     (in_bom yes) (on_board yes) (dnp no)
@@ -164,7 +180,7 @@ for lib, name, ref, value, px, py, netfn, note in placements:
   )''')
     if note:
         for li, linetxt in enumerate(note.split("\\n")):
-            body.append(f'  (text "{linetxt}" (at {px} {py+11.43+li*2.54} 0) (effects (font (size 1.0 1.0) (italic yes)) (justify left)) (uuid "{U()}"))')
+            body.append(f'  (text "{linetxt}" (at {px} {py+note_dy+li*2.54} 0) (effects (font (size 1.0 1.0) (italic yes)) (justify left)) (uuid "{U()}"))')
     for num, pname, sx, sy in sym_pins[f"{lib}:{name}"]:
         ax, ay = px + sx, py - sy
         net = netfn(num, pname)
