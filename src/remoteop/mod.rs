@@ -322,8 +322,8 @@ async fn handle_conn(sock: tokio::net::TcpStream, deps: Arc<Deps>) -> anyhow::Re
                                 radio_id: "k3fall".into(),
                                 timestamp: now_iso8601(),
                             }))),
-                            "radio.audio" => {
-                                if deps.audio_enabled {
+                            "radio.audio" if deps.audio_enabled => {
+                                {
                                     send!(Frame::EventAudioFormat(W::new(AudioFormatEvent {
                                         radio_id: "k3fall".into(),
                                         source_label: deps.cfg.audio.label.clone(),
