@@ -249,7 +249,11 @@
     const w = fallsCanvas.width;
     const h = fallsCanvas.height;
     if (h > 1) wctx.drawImage(fallsCanvas, 0, 0, w, h - 1, 0, 1, w, h - 1);
+    // Fewer bins than pixels (deep zoom): interpolate the stretch so the
+    // display reads as a continuous spectrum instead of blocky bins.
+    wctx.imageSmoothingEnabled = n < w;
     wctx.drawImage(rowCanvas, 0, 0, n, 1, 0, 0, w, 1);
+    wctx.imageSmoothingEnabled = false;
 
     drawSpectrum(bins);
     frameCount++;
@@ -405,7 +409,7 @@
       e.preventDefault();
       if (!status) return;
       const factor = e.deltaY > 0 ? 0.5 : 2;
-      const minSpan = Math.max(1, status.bin_hz * 16);
+      const minSpan = Math.max(1, status.bin_hz * 128);
       const maxSpan = status.sample_rate;
       const next = Math.min(maxSpan, Math.max(minSpan, Math.round(spanHz * factor)));
       if (next !== spanHz) {
