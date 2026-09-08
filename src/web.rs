@@ -486,17 +486,18 @@ async fn handle_client_text(
             );
         }
         Ok(ClientMsg::Power { on }) => {
-            let Some(url) = state.cfg.power.url.clone() else {
+            let Some(device) = state.cfg.power.device.clone() else {
                 let _ = send_json(
                     sender,
                     &ServerMsg::Error {
-                        message: "power control not configured ([power] url)".to_string(),
+                        message: "power control not configured ([power] device)".to_string(),
                     },
                 )
                 .await;
                 return;
             };
-            let result = relay_power(&url, on).await;
+            let baud = state.cfg.power.baud;
+            let result = relay_power(device, baud, on).await;
             if let Err(err) = &result {
                 tracing::warn!(?err, "power relay failed");
             }
@@ -521,17 +522,33 @@ async fn handle_client_text(
     }
 }
 
-/// Forward a power request to the k3pwr ESP32 endpoint.
-async fn relay_power(base_url: &str, on: bool) -> anyhow::Result<()> {
-    let url = format!("{}/power", base_url.trim_end_matches('/'));
-    let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(5))
-        .build()?;
-    client
-        .post(&url)
-        .json(&serde_json::json!({ "on": on }))
-        .send()
-        .await?
-        .error_for_status()?;
-    Ok(())
+/// Forward a power request to the k3pwr ESP32 over USB serial. Opens the
+/// port per command (survives replug, avoids holding it) and waits for the
+/// firmware's "ok on"/"ok off" ack, skipping any boot/log chatter.
+async fn relay_power(device: String, baud: u32, on: bool) -> anyhow::Result<()> {
+    tokio::task::spawn_blocking(move || -> anyhow::Result<()> {
+        use std::io::{BufRead, BufReader, Write};
+        let want = if on { "ok on" } else { "ok off" };
+        let cmd = if on { "on\n" } else { "off\n" };
+        let port = serialport::new(&device, baud)
+            .timeout(std::time::Duration::from_millis(500))
+            .open()?;
+        let mut writer = port.try_clone()?;
+        writer.write_all(cmd.as_bytes())?;
+        writer.flush()?;
+        let mut reader = BufReader::new(port);
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(3);
+        let mut line = String::new();
+        while std::time::Instant::now() < deadline {
+            line.clear();
+            match reader.read_line(&mut line) {
+                Ok(_) if line.trim() == want => return Ok(()),
+                Ok(_) => continue, // boot banner / log noise / stale acks
+                Err(err) if err.kind() == std::io::ErrorKind::TimedOut => continue,
+                Err(err) => return Err(err.into()),
+            }
+        }
+        anyhow::bail!("no ack from k3pwr on {device}")
+    })
+    .await?
 }

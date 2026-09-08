@@ -71,6 +71,7 @@ low_hz  = 50_000_000
 high_hz = 54_000_000
 direction = 1
 
-# Remote power control (k3pwr ESP32 on the LAN). Comment out to disable.
+# Remote power control (k3pwr ESP32 on USB). Comment out to disable.
 [power]
-url = "http://k3pwr.local"
+device = "/dev/ttyACM0"
+baud = 115200

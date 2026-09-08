@@ -213,9 +213,15 @@ fn default_spots_poll_secs() -> u64 {
     30
 }
 
-/// Remote power control endpoint (k3pwr ESP32). None disables the feature.
+/// Remote power control via the k3pwr ESP32 on USB serial. None disables.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct PowerConfig {
     #[serde(default)]
-    pub url: Option<String>,
+    pub device: Option<String>,
+    #[serde(default = "default_power_baud")]
+    pub baud: u32,
+}
+
+fn default_power_baud() -> u32 {
+    115_200
 }

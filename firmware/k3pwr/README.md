@@ -1,16 +1,15 @@
 # k3pwr — remote K3 power control
 
 Rust (ESP-IDF, std) firmware for the **Waveshare ESP32-P4-Module-DEV-KIT**.
-Replaces the RemoteRig for K3 power-on: the board sits on the shack LAN via
-its RJ45 Ethernet jack, and the k3fall server's PWR button drives it.
+Replaces the RemoteRig for K3 power-on: the board plugs into the Pi over
+USB (powered by it, enumerates as `/dev/ttyACM0` via the P4's
+USB-Serial-JTAG), and the k3fall server's PWR button drives it.
 
 ## How it works
 
-- Ethernet (IP101GRI, RMII) → DHCP → announces itself as `k3pwr.local`.
-- HTTP API on port 80:
-  - `GET /power` → `{"on":bool}`
-  - `POST /power` with `{"on":true|false}`
-  - `GET /health`
+- Line protocol over the USB serial console:
+  - `on\n` / `off\n` → sets the power line, replies `ok on` / `ok off`
+  - `status\n` → replies with current state
 - GPIO4 drives an external open-collector stage. **Level semantics** (same
   as RemoteRig OUT0 mode "Connect"): stage conducting → K3 ACC pin 8 held
   at ground → radio ON. Released → radio OFF. Boot state is OFF.
@@ -41,13 +40,6 @@ cable's Radio-RRC end; its HD15 goes to the K3 ACC port:
 The 100k gate pulldown guarantees the radio stays off while the ESP32
 boots or is unpowered.
 
-## Ethernet pins (board-fixed)
-
-IP101GRI on RMII: MDC=GPIO31, MDIO=GPIO52, PHY RST=GPIO51, REF_CLK in on
-GPIO50 (50 MHz from the PHY), RXD0/1=GPIO29/30, CRS_DV=GPIO28,
-TXD0/1=GPIO34/35, TX_EN=GPIO49. GPIO4 for the power stage stays clear of
-all of these.
-
 ## Build & flash
 
 Prereqs (one-time): `rustup toolchain install nightly --component rust-src`,
@@ -65,7 +57,8 @@ In `/etc/k3fall/config.toml`:
 
 ```toml
 [power]
-url = "http://k3pwr.local"
+device = "/dev/ttyACM0"   # or a stable /dev/serial/by-id/... path
+baud = 115200             # ignored by USB CDC, required by the API
 ```
 
 Restart k3fall; the PWR chip appears functional in the web UI topbar.
