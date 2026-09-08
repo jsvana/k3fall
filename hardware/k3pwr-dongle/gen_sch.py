@@ -103,12 +103,12 @@ def ch340_net(pin_name):
 
 placements = []  # (lib,name,ref,value,x,y, netmap: pin_number->net or None=NC)
 SLOT = 0
-def place(lib, name, ref, value, netfn):
+def place(lib, name, ref, value, netfn, note=None):
     global SLOT
     col, row = SLOT % 9, SLOT // 9
     x = 30.48 + col * 43.18
     y = 78.74 + row * 95.25
-    placements.append((lib, name, ref, value, x, y, netfn))
+    placements.append((lib, name, ref, value, x, y, netfn, note))
     SLOT += 1
 
 sym_pins = {f"{lib}:{name}": pins(extract(*PIN_SOURCE[f"{lib}:{name}"])) for lib, name in LIBS}
@@ -125,13 +125,17 @@ place("Device", "R", "R4", "10k", netfn_fixed({"1": "VBUS", "2": "Q1B"}))
 place("Transistor_BJT", "Q_PNP_BEC", "Q1", "MMBT3906",
       lambda num, pname: {"B": "Q1B", "E": "VBUS", "C": "GATE_PRE"}.get(pname))
 place("Device", "R", "R2", "33k", netfn_fixed({"1": "GATE_PRE", "2": "GATE"}))
-place("Device", "C_Polarized", "C4", "10u", netfn_fixed({"1": "GATE", "2": "GND"}))
+place("Device", "C_Polarized", "C4", "10u", netfn_fixed({"1": "GATE", "2": "GND"}),
+      note="gate glitch filter: with R2/R3 swallows\\nDTR pulses from USB enumeration\\n(~0.3s on, ~1s release)")
 place("Device", "R", "R3", "100k", netfn_fixed({"1": "GATE", "2": "GND"}))
 place("Transistor_FET", "Q_NMOS_GSD", "Q2", "2N7002",
       lambda num, pname: {"G": "GATE", "S": "GND", "D": "PWR_SINK"}.get(pname))
-place("Device", "C", "C1", "100n", netfn_fixed({"1": "VBUS", "2": "GND"}))
-place("Device", "C_Polarized", "C3", "4.7u", netfn_fixed({"1": "VBUS", "2": "GND"}))
-place("Device", "C", "C2", "100n", netfn_fixed({"1": "V3", "2": "GND"}))
+place("Device", "C", "C1", "100n", netfn_fixed({"1": "VBUS", "2": "GND"}),
+      note="CH340C VCC decoupling\\n(place at pin 16)")
+place("Device", "C_Polarized", "C3", "4.7u", netfn_fixed({"1": "VBUS", "2": "GND"}),
+      note="VBUS bulk reservoir\\nfor pigtail inductance")
+place("Device", "C", "C2", "100n", netfn_fixed({"1": "V3", "2": "GND"}),
+      note="V3 internal-regulator bypass\\n(required by CH340 datasheet)")
 place("Device", "R", "R5", "1k", netfn_fixed({"1": "VBUS", "2": "LED_A"}))
 place("Device", "LED", "D1", "green", netfn_fixed({"1": "GND", "2": "LED_A"}))
 place("Connector", "DE15_Pins_HighDensity", "J2", "K3_ACC",
@@ -148,7 +152,7 @@ place("power", "PWR_FLAG", "#FLG02", "PWR_FLAG", netfn_fixed({"1": "GND"}))
 body = []
 labels = []
 noconnects = []
-for lib, name, ref, value, px, py, netfn in placements:
+for lib, name, ref, value, px, py, netfn, note in placements:
     su = U()
     body.append(f'''  (symbol (lib_id "{lib}:{name}") (at {px} {py} 0) (unit 1)
     (in_bom yes) (on_board yes) (dnp no)
@@ -158,6 +162,9 @@ for lib, name, ref, value, px, py, netfn in placements:
     (instances (project "k3pwr-dongle"
       (path "/e63e39d7-6ac0-4ffd-9b4c-4a61a49d5db0" (reference "{ref}") (unit 1))))
   )''')
+    if note:
+        for li, linetxt in enumerate(note.split("\\n")):
+            body.append(f'  (text "{linetxt}" (at {px} {py+11.43+li*2.54} 0) (effects (font (size 1.0 1.0) (italic yes)) (justify left)) (uuid "{U()}"))')
     for num, pname, sx, sy in sym_pins[f"{lib}:{name}"]:
         ax, ay = px + sx, py - sy
         net = netfn(num, pname)
