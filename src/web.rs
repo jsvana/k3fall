@@ -54,21 +54,30 @@ pub fn router(state: AppState) -> Router {
 
 async fn index() -> impl IntoResponse {
     (
-        [(header::CONTENT_TYPE, "text/html; charset=utf-8")],
+        [
+            (header::CONTENT_TYPE, "text/html; charset=utf-8"),
+            (header::CACHE_CONTROL, "no-cache"),
+        ],
         include_str!("../web/index.html"),
     )
 }
 
 async fn app_js() -> impl IntoResponse {
     (
-        [(header::CONTENT_TYPE, "application/javascript")],
+        [
+            (header::CONTENT_TYPE, "application/javascript"),
+            (header::CACHE_CONTROL, "no-cache"),
+        ],
         include_str!("../web/app.js"),
     )
 }
 
 async fn style_css() -> impl IntoResponse {
     (
-        [(header::CONTENT_TYPE, "text/css")],
+        [
+            (header::CONTENT_TYPE, "text/css"),
+            (header::CACHE_CONTROL, "no-cache"),
+        ],
         include_str!("../web/style.css"),
     )
 }
