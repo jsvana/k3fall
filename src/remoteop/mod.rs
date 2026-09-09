@@ -135,6 +135,11 @@ pub async fn run_server_on(listener: TcpListener, deps: Arc<Deps>) {
         match listener.accept().await {
             Ok((sock, peer)) => {
                 tracing::info!(%peer, "remoteop: connection");
+                // CW keying commands are tiny line-delimited frames; Nagle +
+                // delayed ACK adds up to ~200 ms of jitter per exchange.
+                if let Err(err) = sock.set_nodelay(true) {
+                    tracing::warn!(?err, "remoteop: set_nodelay failed");
+                }
                 let deps = deps.clone();
                 tokio::spawn(async move {
                     if let Err(err) = handle_conn(sock, deps).await {
