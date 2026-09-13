@@ -7,3 +7,4 @@ config.toml
 hardware/**/__pycache__/
 hardware/**/*-backups/
 hardware/**/*.kicad_prl
+hardware/**/~*.lck
