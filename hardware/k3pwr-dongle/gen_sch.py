@@ -59,7 +59,6 @@ LIBS = [
     ("Interface_USB", "CH340C"),
     ("Device", "R"),
     ("Device", "C"),
-    ("Device", "C_Polarized"),
     ("Device", "LED"),
     ("Transistor_BJT", "Q_PNP_BEC"),
     ("Transistor_FET", "Q_NMOS_GSD"),
@@ -138,7 +137,7 @@ def P(ref, num):
 place("J1", "Connector_Generic", "Conn_01x05", "USB_pigtail", 30.48, 43.18, 0, 'y')
 place("F1", "Device", "Polyfuse", "500mA", 55.88, 38.10, 90)
 place("D2", "Device", "D_Schottky", "SS14", 73.66, 38.10, 180)
-place("C3", "Device", "C_Polarized", "4.7u", 101.60, 45.72)
+place("C3", "Device", "C", "4.7u", 101.60, 45.72)
 place("U2", "Power_Protection", "USBLC6-2P6", "USBLC6-2SC6", 63.50, 53.34)
 place("R5", "Device", "R", "1k", 30.48, 66.04)
 place("D1", "Device", "LED", "green", 30.48, 76.20, 90)
@@ -153,7 +152,7 @@ place("R1", "Device", "R", "4.7k", 36.83, 137.16, 90)
 place("R4", "Device", "R", "10k", 45.72, 127.00)
 place("Q1", "Transistor_BJT", "Q_PNP_BEC", "MMBT3906", 55.88, 137.16, 0, 'x')
 place("R2", "Device", "R", "33k", 68.58, 148.59, 90)
-place("C4", "Device", "C_Polarized", "10u", 80.01, 156.21)
+place("C4", "Device", "C", "10u", 80.01, 156.21)
 place("R3", "Device", "R", "100k", 92.71, 156.21)
 place("Q2", "Transistor_FET", "Q_NMOS_GSD", "2N7002", 105.41, 148.59)
 # --- Group D: K3 ACC output ------------------------------------------------
@@ -312,6 +311,33 @@ NOTES = [
     (222.25, 156.21, "pin 5 = GND, all others unused"),
 ]
 
+# Footprint + JLCPCB LCSC part number per component (LCSC "" = hand-solder /
+# not JLC-assembled).  Basic/Preferred parts chosen where available.
+FPLCSC = {
+    "J1": ("Connector_PinHeader_2.54mm:PinHeader_1x05_P2.54mm_Vertical", ""),
+    "F1": ("Fuse:Fuse_1206_3216Metric", "C720075"),
+    "D2": ("Diode_SMD:D_SMA", "C2480"),
+    "C3": ("Capacitor_SMD:C_0805_2012Metric", "C1779"),
+    "U2": ("Package_TO_SOT_SMD:SOT-23-6", "C2687116"),
+    "R5": ("Resistor_SMD:R_0603_1608Metric", "C21190"),
+    "D1": ("LED_SMD:LED_0805_2012Metric", "C2297"),
+    "U1": ("Package_SO:SOIC-16_3.9x9.9mm_P1.27mm", "C84681"),
+    "C1": ("Capacitor_SMD:C_0603_1608Metric", "C14663"),
+    "C2": ("Capacitor_SMD:C_0603_1608Metric", "C14663"),
+    "D4": ("LED_SMD:LED_0805_2012Metric", "C2296"),
+    "R7": ("Resistor_SMD:R_0603_1608Metric", "C21190"),
+    "R1": ("Resistor_SMD:R_0603_1608Metric", "C23162"),
+    "R4": ("Resistor_SMD:R_0603_1608Metric", "C25804"),
+    "Q1": ("Package_TO_SOT_SMD:SOT-23", "C7420354"),
+    "R2": ("Resistor_SMD:R_0603_1608Metric", "C4216"),
+    "C4": ("Capacitor_SMD:C_0805_2012Metric", "C15850"),
+    "R3": ("Resistor_SMD:R_0603_1608Metric", "C25803"),
+    "Q2": ("Package_TO_SOT_SMD:SOT-23", "C916396"),
+    "R6": ("Resistor_SMD:R_0603_1608Metric", "C22775"),
+    "D3": ("Diode_SMD:D_SMA", "C19077535"),
+    "J2": ("Connector_Dsub:DSUB-15-HD_Pins_Horizontal_P2.29x2.54mm_EdgePinOffset8.35mm_Housed_MountingHolesOffset10.89mm", ""),
+}
+
 # Ref/Value text spots that the default (above/below symbol) rules would put
 # on top of wires, power symbols, or neighbors.
 OVERRIDES = {
@@ -363,8 +389,11 @@ for ref in ORDER:
     rx, ry = ov.get("ref", (x, top - 2.54))
     vx, vy = ov.get("value", (x, bot + 2.54))
     pa = 90 if rot in (90, 270) else 0   # cancels symbol rotation -> horizontal text
+    fp, lcsc = FPLCSC[ref]
     props = (f'    (property "Reference" "{ref}" (at {g(rx)} {g(ry)} {pa}) (effects (font (size 1.27 1.27))))\n'
-             f'    (property "Value" "{value}" (at {g(vx)} {g(vy)} {pa}) (effects (font (size 1.27 1.27))))')
+             f'    (property "Value" "{value}" (at {g(vx)} {g(vy)} {pa}) (effects (font (size 1.27 1.27))))\n'
+             f'    (property "Footprint" "{fp}" (at {g(x)} {g(y)} 0) (effects (font (size 1.27 1.27)) (hide yes)))\n'
+             f'    (property "LCSC" "{lcsc}" (at {g(x)} {g(y)} 0) (effects (font (size 1.27 1.27)) (hide yes)))')
     body.append(sym_block(lib, name, ref, value, x, y, rot, mir, props))
 
 for ref, pname, x, y in POWER:
