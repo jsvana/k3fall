@@ -2,8 +2,9 @@
 """Generate the initial k3pwr-dongle PCB (run with KiCad's bundled python3:
 /Applications/KiCad/KiCad.app/Contents/Frameworks/Python.framework/Versions/Current/bin/python3).
 
-Board: 80x32mm 4-layer (F.Cu / In1.Cu=GND / In2.Cu=VBUS / B.Cu), JLCPCB
-JLC7628 stackup assumed.  USB pigtail pads at the left edge, DE-15HD plug
+Board: 68x32mm 4-layer, JLCPCB JLC7628 stackup assumed.  Layers:
+F.Cu signals / In1.Cu solid GND / In2.Cu split power (VBUS left, ACC_PWR
+under the connector end) / B.Cu GND pour.  USB pigtail pads at the left edge, DE-15HD plug
 off the right edge; placement follows schematic signal flow left->right.
 Mounting: 2x M3 at the left corners, 1x M3 mid-board, plus the DSUB shell
 holes (3.2mm, 25mm apart) at the right.  Pads get nets from the exported
@@ -69,7 +70,7 @@ for name in sorted(netnames):
     nets[name] = ni
 
 # Board outline: (BX0,BY0)-(BX1,BY1)
-BX0, BY0, BX1, BY1 = 20.0, 20.0, 100.0, 52.0
+BX0, BY0, BX1, BY1 = 20.0, 20.0, 88.0, 52.0
 MIDY = (BY0 + BY1) / 2
 
 for a, b in [((BX0, BY0), (BX1, BY0)), ((BX1, BY0), (BX1, BY1)),
@@ -88,26 +89,26 @@ PLACE = {
     "R8": (31.5, 30.5, 0),      # CC1 pulldown, next to connector
     "R9": (31.5, 41.5, 0),      # CC2 pulldown
     "F1": (33.0, 26.0, 0),
-    "D2": (41.0, 26.0, 0),
-    "C3": (48.0, 26.0, 0),
-    "U2": (37.0, 33.5, 0),
+    "D2": (40.0, 26.0, 0),
+    "C3": (46.5, 26.0, 0),
+    "U2": (36.5, 33.5, 0),
     "R5": (33.0, 45.5, 0),
     "D1": (38.5, 45.5, 0),
-    "U1": (50.0, 36.0, 0),
-    "C1": (54.5, 29.5, 0),
-    "C2": (45.5, 30.5, 90),
-    "R7": (46.0, 45.5, 0),
-    "D4": (51.5, 45.5, 0),
-    "R1": (64.0, 30.0, 0),
-    "R4": (64.0, 26.0, 0),
-    "Q1": (68.5, 33.0, 0),
-    "R2": (68.5, 27.0, 90),
-    "C4": (68.0, 42.0, 0),
-    "R3": (72.5, 42.0, 0),
-    "Q2": (76.0, 36.0, 0),
-    "R6": (81.5, 31.0, 0),
-    "D3": (83.0, 42.0, 90),
-    "J2": (89.11, 40.315, 90),  # edge line lands on BX1, shell centered
+    "U1": (46.0, 36.0, 0),
+    "C1": (50.5, 29.5, 0),
+    "C2": (41.5, 30.5, 90),
+    "R7": (42.5, 45.5, 0),
+    "D4": (47.0, 45.5, 0),
+    "R1": (58.0, 30.0, 0),
+    "R4": (58.0, 26.0, 0),
+    "Q1": (62.0, 33.0, 0),
+    "R2": (62.0, 27.0, 90),
+    "C4": (62.0, 42.0, 0),
+    "R3": (66.5, 42.0, 0),
+    "Q2": (66.0, 36.0, 0),
+    "R6": (71.0, 31.0, 0),
+    "D3": (72.5, 42.0, 90),
+    "J2": (77.11, 40.315, 90),  # edge line lands on BX1, shell centered
 }
 
 for ref, (fpname, value, lcsc) in sorted(comps.items()):
@@ -135,7 +136,7 @@ for ref, (fpname, value, lcsc) in sorted(comps.items()):
             pad.SetNet(nets[net])
 
 # --- Mounting holes --------------------------------------------------------
-for href, hx, hy in [("H1", 24.5, 24.5), ("H2", 24.5, 47.5), ("H3", 60.0, 36.0)]:
+for href, hx, hy in [("H1", 24.5, 24.5), ("H2", 24.5, 47.5), ("H3", 54.0, 36.0)]:
     fp = pcbnew.FootprintLoad(f"{FPDIR}/MountingHole.pretty", "MountingHole_3.2mm_M3")
     fp.SetReference(href)
     fp.SetValue("M3")
@@ -146,21 +147,27 @@ for href, hx, hy in [("H1", 24.5, 24.5), ("H2", 24.5, 47.5), ("H3", 60.0, 36.0)]
     fp.Reference().SetVisible(False)
 
 # --- Inner planes: In1 = GND, In2 = VBUS -----------------------------------
-def add_zone(layer, netname):
+def add_zone(layer, netname, x0, y0, x1, y1, thermal=False):
     zone = pcbnew.ZONE(board)
     zone.SetLayer(layer)
     zone.SetNet(nets[netname])
     zone.SetIsFilled(True)
-    zone.SetPadConnection(pcbnew.ZONE_CONNECTION_FULL)
+    zone.SetPadConnection(pcbnew.ZONE_CONNECTION_THERMAL if thermal
+                          else pcbnew.ZONE_CONNECTION_FULL)
     outline = zone.Outline()
     outline.NewOutline()
-    for px, py in [(BX0, BY0), (BX1, BY0), (BX1, BY1), (BX0, BY1)]:
+    for px, py in [(x0, y0), (x1, y0), (x1, y1), (x0, y1)]:
         outline.Append(FromMM(px), FromMM(py))
     board.Add(zone)
     return zone
 
-add_zone(pcbnew.In1_Cu, "GND")
-add_zone(pcbnew.In2_Cu, "VBUS")
+# In1: solid ground plane.  In2: split power plane, VBUS under the USB /
+# logic section, ACC_PWR under the connector end.  B.Cu: second ground pour
+# (thermal spokes so the through-hole parts stay hand-solderable).
+add_zone(pcbnew.In1_Cu, "GND", BX0, BY0, BX1, BY1)
+add_zone(pcbnew.In2_Cu, "VBUS", BX0, BY0, 69.5, BY1)
+add_zone(pcbnew.In2_Cu, "/ACC_PWR", 70.0, BY0, BX1, BY1)
+add_zone(pcbnew.B_Cu, "GND", BX0, BY0, BX1, BY1, thermal=True)
 
 filler = pcbnew.ZONE_FILLER(board)
 filler.Fill(board.Zones())
@@ -179,9 +186,9 @@ def silk(textstr, x, y, layer=pcbnew.F_SilkS, size=1.0):
 
 silk("k3pwr", 27.5, 22.0, size=1.5)
 silk("W6JY", 35.0, 22.0)
-silk("K3 ACC", 84.0, 24.0)
-silk("USB", 25.0, 44.0)
-silk("JLCJLCJLCJLC", 60.0, 46.0, layer=pcbnew.B_SilkS)  # JLC order number spot
+silk("K3 ACC", 69.0, 23.0)
+silk("USB", 25.0, 44.5)
+silk("JLCJLCJLCJLC", 54.0, 46.0, layer=pcbnew.B_SilkS)  # JLC order number spot
 
 pcbnew.SaveBoard(OUT, board)
 
