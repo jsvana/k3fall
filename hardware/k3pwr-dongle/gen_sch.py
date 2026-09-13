@@ -55,7 +55,7 @@ def pins(sym_sexp):
     return out
 
 LIBS = [
-    ("Connector_Generic", "Conn_01x05"),
+    ("Connector", "USB_C_Receptacle_USB2.0_16P"),
     ("Interface_USB", "CH340C"),
     ("Device", "R"),
     ("Device", "C"),
@@ -134,13 +134,15 @@ def P(ref, num):
     raise KeyError(f"{ref} pin {num}")
 
 # --- Group A: USB input + protection ---------------------------------------
-place("J1", "Connector_Generic", "Conn_01x05", "USB_pigtail", 30.48, 43.18, 0, 'y')
-place("F1", "Device", "Polyfuse", "500mA", 55.88, 38.10, 90)
-place("D2", "Device", "D_Schottky", "SS14", 73.66, 38.10, 180)
-place("C3", "Device", "C", "4.7u", 101.60, 45.72)
-place("U2", "Power_Protection", "USBLC6-2P6", "USBLC6-2SC6", 63.50, 53.34)
-place("R5", "Device", "R", "1k", 30.48, 66.04)
-place("D1", "Device", "LED", "green", 30.48, 76.20, 90)
+place("J1", "Connector", "USB_C_Receptacle_USB2.0_16P", "USB-C", 25.40, 44.45)
+place("F1", "Device", "Polyfuse", "500mA", 53.34, 29.21, 90)
+place("D2", "Device", "D_Schottky", "SS14", 71.12, 29.21, 180)
+place("C3", "Device", "C", "4.7u", 99.06, 36.83)
+place("U2", "Power_Protection", "USBLC6-2P6", "USBLC6-2SC6", 63.50, 44.45)
+place("R8", "Device", "R", "5.1k", 48.26, 34.29, 90)
+place("R9", "Device", "R", "5.1k", 46.99, 36.83, 90)
+place("R5", "Device", "R", "1k", 88.90, 57.15)
+place("D1", "Device", "LED", "green", 88.90, 67.31, 90)
 # --- Group B: USB-serial bridge --------------------------------------------
 place("U1", "Interface_USB", "CH340C", "CH340C", 187.96, 48.26)
 place("C1", "Device", "C", "100n", 172.72, 33.02)
@@ -184,32 +186,46 @@ def wire(*pts):
         assert a[0] == b[0] or a[1] == b[1], f"non-orthogonal wire {a}-{b}"
         WIRES.append((a, b))
 
-# --- Group A wiring: pigtail -> polyfuse -> reverse guard -> VBUS ----------
-wire(P("J1", "1"), P("F1", "1"))                       # VBUS_IN
-LLABELS.append(("VBUS_IN", 38.10, 38.10))
+# --- Group A wiring: USB-C -> polyfuse -> reverse guard -> VBUS ------------
+wire(P("J1", "A4"), P("F1", "1"))                      # VBUS_IN
+for pn in ("A9", "B4", "B9"):
+    P("J1", pn)                                        # stacked with A4
+LLABELS.append(("VBUS_IN", 41.91, 29.21))
 wire(P("F1", "2"), P("D2", "2"))                       # VBUS_F -> anode
-LLABELS.append(("VBUS_F", 60.96, 38.10))
-wire(P("D2", "1"), (101.60, 38.10), P("C3", "1"))      # cathode = VBUS rail
-flag(1, 83.82, 38.10); JUNCTIONS.append((83.82, 38.10))
-vbus(91.44, 38.10);    JUNCTIONS.append((91.44, 38.10))
-wire(P("C3", "2"), (101.60, 52.07)); gnd(101.60, 52.07)
-wire(P("J1", "4"), (38.10, 45.72), (38.10, 48.26))     # pigtail grounds
-wire(P("J1", "5"), (38.10, 48.26)); JUNCTIONS.append((38.10, 48.26))
-wire((38.10, 48.26), (38.10, 50.80)); gnd(38.10, 50.80)
-# U2 is flow-through ESD: connector-side nets (UD-_IN/UD+_IN) stay separate
-# from the device-side UD-/UD+ so layout is forced through the chip.
-wire(P("J1", "2"), (46.99, 40.64), (46.99, 53.34), P("U2", "1"))
-LLABELS.append(("UD-_IN", 38.10, 40.64))
-wire(P("J1", "3"), (44.45, 43.18), (44.45, 55.88), P("U2", "3"))
-LLABELS.append(("UD+_IN", 38.10, 43.18))
-wire(P("U2", "5"), (63.50, 45.72)); vbus(63.50, 45.72)
-wire(P("U2", "2"), (63.50, 63.50)); gnd(63.50, 63.50)
-wire(P("U2", "6"), (78.74, 53.34)); GLABELS.append(("UD-", 78.74, 53.34, 0))
-wire(P("U2", "4"), (78.74, 55.88)); GLABELS.append(("UD+", 78.74, 55.88, 0))
-vbus(30.48, 59.69); wire((30.48, 59.69), P("R5", "1"))
+LLABELS.append(("VBUS_F", 58.42, 29.21))
+wire(P("D2", "1"), (99.06, 29.21), P("C3", "1"))       # cathode = VBUS rail
+vbus(80.01, 29.21); JUNCTIONS.append((80.01, 29.21))
+flag(1, 87.63, 29.21); JUNCTIONS.append((87.63, 29.21))
+wire(P("C3", "2"), (99.06, 43.18)); gnd(99.06, 43.18)
+# CC pulldowns (Rd): dongle presents as a 5V UFP so C-to-C cables power it
+wire(P("J1", "A5"), P("R8", "1"))
+wire(P("R8", "2"), (53.34, 34.29), (53.34, 36.83))
+wire(P("J1", "B5"), P("R9", "1"))
+wire(P("R9", "2"), (53.34, 36.83)); JUNCTIONS.append((53.34, 36.83))
+gnd(53.34, 36.83)
+# A/B data pins join, then flow-through ESD: connector-side nets
+# (UD-_IN/UD+_IN) stay separate so layout is forced through the chip.
+wire(P("J1", "A7"), (43.18, 41.91), (43.18, 44.45))
+wire(P("J1", "B7"), (43.18, 44.45)); JUNCTIONS.append((43.18, 44.45))
+wire((43.18, 44.45), P("U2", "1"))
+LLABELS.append(("UD-_IN", 44.45, 44.45))
+wire(P("J1", "A6"), (43.18, 46.99), (43.18, 49.53))
+wire(P("J1", "B6"), (43.18, 49.53)); JUNCTIONS.append((43.18, 49.53))
+wire((43.18, 49.53), (53.34, 49.53), (53.34, 46.99), P("U2", "3"))
+LLABELS.append(("UD+_IN", 44.45, 49.53))
+wire(P("U2", "5"), (63.50, 38.10)); vbus(63.50, 38.10)
+wire(P("U2", "2"), (63.50, 54.61)); gnd(63.50, 54.61)
+wire(P("U2", "6"), (78.74, 44.45)); GLABELS.append(("UD-", 78.74, 44.45, 0))
+wire(P("U2", "4"), (78.74, 46.99)); GLABELS.append(("UD+", 78.74, 46.99, 0))
+# USB-C ground pins (stacked) + shell
+wire(P("J1", "A1"), (25.40, 69.85)); gnd(25.40, 69.85)
+for pn in ("A12", "B1", "B12"):
+    P("J1", pn)                                        # stacked with A1
+wire(P("J1", "SH"), (17.78, 68.58), (25.40, 68.58)); JUNCTIONS.append((25.40, 68.58))
+vbus(88.90, 53.34); wire((88.90, 53.34), P("R5", "1"))
 wire(P("R5", "2"), P("D1", "2"))                       # LED_A
-wire(P("D1", "1"), (30.48, 82.55)); gnd(30.48, 82.55)
-flag(2, 110.49, 46.99); wire((110.49, 46.99), (110.49, 49.53)); gnd(110.49, 49.53)
+wire(P("D1", "1"), (88.90, 73.66)); gnd(88.90, 73.66)
+flag(2, 110.49, 33.02); wire((110.49, 33.02), (110.49, 35.56)); gnd(110.49, 35.56)
 
 # --- Group B wiring: CH340C ------------------------------------------------
 wire(P("C1", "1"), (185.42, 29.21), P("U1", "16"))     # VCC rail + decoupling
@@ -263,25 +279,26 @@ wire(P("J2", "5"), (215.90, 121.92), (215.90, 124.46)); gnd(215.90, 124.46)
 
 # ---------------------------------------------------------------------------
 GROUPS = [
-    ("USB INPUT + PROTECTION", 12.70, 17.78, 121.92, 95.25),
+    ("USB INPUT + PROTECTION", 12.70, 17.78, 121.92, 83.82),
     ("USB-SERIAL BRIDGE", 144.78, 17.78, 229.87, 81.28),
     ("POWER-ON LOGIC", 12.70, 110.49, 160.02, 186.69),
     ("K3 ACC OUTPUT", 165.10, 110.49, 284.48, 163.83),
 ]
 
 NOTES = [
-    (13.97, 27.94, "solder pads for USB-A pigtail to the Pi"),
-    (13.97, 30.48, "(VBUS, D-, D+, GND, shield->GND)"),
-    (49.53, 27.94, "protects the Pi USB port from"),
-    (49.53, 30.48, "board or hood-wiring faults"),
-    (80.01, 27.94, "reverse-polarity guard for a"),
-    (80.01, 30.48, "miswired pigtail (~0.3V drop)"),
-    (95.25, 58.42, "VBUS bulk reservoir"),
-    (95.25, 60.96, "for pigtail inductance"),
-    (49.53, 68.58, "IEC 61000-4-2 ESD clamp"),
-    (49.53, 71.12, "for D+/D-/VBUS"),
-    (13.97, 88.90, "power LED current limit (~3mA)"),
-    (13.97, 91.44, "USB power indicator"),
+    (13.97, 76.20, "USB-C receptacle (USB 2.0 pins);"),
+    (13.97, 78.74, "R8/R9 CC pulldowns present the"),
+    (13.97, 81.28, "dongle as a 5V UFP device"),
+    (57.15, 20.32, "500mA polyfuse protects the Pi"),
+    (57.15, 22.86, "USB port from downstream faults"),
+    (76.20, 33.02, "reverse/backfeed guard"),
+    (76.20, 35.56, "(~0.3V drop)"),
+    (95.25, 49.53, "VBUS bulk reservoir"),
+    (95.25, 52.07, "at the connector"),
+    (57.15, 59.69, "IEC 61000-4-2 ESD clamp"),
+    (57.15, 62.23, "for D+/D-/VBUS"),
+    (95.25, 57.15, "LED current limit (~3mA)"),
+    (95.25, 69.85, "USB power indicator"),
     (147.32, 33.02, "CH340C VCC decoupling"),
     (147.32, 35.56, "(C1 at pin 16)"),
     (205.74, 60.96, "D4 blinks on serial data"),
@@ -314,7 +331,9 @@ NOTES = [
 # Footprint + JLCPCB LCSC part number per component (LCSC "" = hand-solder /
 # not JLC-assembled).  Basic/Preferred parts chosen where available.
 FPLCSC = {
-    "J1": ("Connector_PinHeader_2.54mm:PinHeader_1x05_P2.54mm_Vertical", ""),
+    "J1": ("Connector_USB:USB_C_Receptacle_HRO_TYPE-C-31-M-12", "C165948"),
+    "R8": ("Resistor_SMD:R_0603_1608Metric", "C23186"),
+    "R9": ("Resistor_SMD:R_0603_1608Metric", "C23186"),
     "F1": ("Fuse:Fuse_1206_3216Metric", "C720075"),
     "D2": ("Diode_SMD:D_SMA", "C2480"),
     "C3": ("Capacitor_SMD:C_0805_2012Metric", "C1779"),
@@ -341,11 +360,14 @@ FPLCSC = {
 # Ref/Value text spots that the default (above/below symbol) rules would put
 # on top of wires, power symbols, or neighbors.
 OVERRIDES = {
-    "J1": {"value": (24.13, 52.07)},
-    "U2": {"ref": (68.58, 45.72), "value": (74.93, 60.96)},
-    "C3": {"ref": (106.68, 43.18), "value": (106.68, 46.99)},
-    "R5": {"ref": (25.40, 62.23), "value": (34.29, 67.31)},
-    "D1": {"ref": (24.13, 73.66), "value": (36.83, 76.20)},
+    "J1": {"ref": (16.51, 24.13), "value": (16.51, 26.67)},
+    "F1": {"value": (46.99, 31.75)},
+    "R8": {"ref": (55.88, 32.39), "value": (57.15, 34.29)},
+    "R9": {"ref": (41.91, 39.37), "value": (57.15, 36.83)},
+    "U2": {"ref": (70.49, 40.64), "value": (72.39, 52.07)},
+    "C3": {"ref": (104.14, 34.29), "value": (104.14, 36.83)},
+    "R5": {"ref": (83.82, 55.88), "value": (93.98, 60.96)},
+    "D1": {"ref": (83.82, 66.04), "value": (94.62, 66.04)},
     "U1": {"value": (176.53, 66.04)},
     "C1": {"value": (166.37, 36.83)},
     "C2": {"value": (221.62, 33.02)},

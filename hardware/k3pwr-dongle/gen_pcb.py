@@ -84,7 +84,9 @@ for a, b in [((BX0, BY0), (BX1, BY0)), ((BX1, BY0), (BX1, BY1)),
 # --- Placement: ref -> (x, y, rot_deg) -------------------------------------
 # Signal flow left->right: pigtail | USB protection | CH340 | logic | ACC out
 PLACE = {
-    "J1": (25.0, 30.92, 0),     # pigtail pads, pin1 top, along left edge
+    "J1": (23.6, 36.0, 270),    # USB-C, opening off the left board edge
+    "R8": (31.5, 30.5, 0),      # CC1 pulldown, next to connector
+    "R9": (31.5, 41.5, 0),      # CC2 pulldown
     "F1": (33.0, 26.0, 0),
     "D2": (41.0, 26.0, 0),
     "C3": (48.0, 26.0, 0),
