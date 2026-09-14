@@ -9,8 +9,8 @@ off the right edge; placement follows schematic signal flow left->right.
 Mounting: 2x M3 at the left corners plus the DSUB shell holes
 (3.2mm, 25mm apart) at the right.  Pads get nets from the exported
 netlist so "Update PCB from Schematic" matches cleanly; LCSC fields are
-carried onto footprints for JLC assembly.  Signal routing is left to the
-ratsnest — this is placement + planes only.  NOTE: the live board
+carried onto footprints for JLC assembly.  Signal routing lives in the board
+file (hand-routed via scripts); regeneration would discard it.  NOTE: the live board
 has hand edits (LED row, silk ref nudges); prefer in-place scripts over
 full regeneration."""
 import re, subprocess, sys, os
@@ -104,11 +104,11 @@ PLACE = {
     "R1": (42.6, 29.05, 0),
     "R4": (42.6, 31.4, 0),
     "Q1": (46.5, 30, 0),
-    "R2": (47.44, 33.4, 90),
+    "R2": (47.44, 33.4, 270),
     "C4": (43.7, 41.5, 90),
     "R3": (46, 41.5, 90),
     "Q2": (46.5, 36.8, 0),
-    "R6": (45.8, 45.7, 90),
+    "R6": (47.9, 46.9, 0),
     "D3": (49, 42, 270),
     "J2": (54.11, 40.315, 90),  # edge line lands on BX1, shell centered
 }
