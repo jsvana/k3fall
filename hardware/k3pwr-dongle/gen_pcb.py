@@ -2,7 +2,7 @@
 """Generate the initial k3pwr-dongle PCB (run with KiCad's bundled python3:
 /Applications/KiCad/KiCad.app/Contents/Frameworks/Python.framework/Versions/Current/bin/python3).
 
-Board: 54x32mm 4-layer, JLCPCB JLC7628 stackup assumed.  Layers:
+Board: 45x32mm 4-layer, JLCPCB JLC7628 stackup assumed.  Layers:
 F.Cu signals / In1.Cu solid GND / In2.Cu split power (VBUS left, ACC_PWR
 under the connector end) / B.Cu GND pour.  USB pigtail pads at the left edge, DE-15HD plug
 off the right edge; placement follows schematic signal flow left->right.
@@ -72,7 +72,7 @@ for name in sorted(netnames):
     nets[name] = ni
 
 # Board outline: (BX0,BY0)-(BX1,BY1)
-BX0, BY0, BX1, BY1 = 20.0, 20.0, 74.0, 52.0
+BX0, BY0, BX1, BY1 = 20.0, 20.0, 65.0, 52.0
 MIDY = (BY0 + BY1) / 2
 
 for a, b in [((BX0, BY0), (BX1, BY0)), ((BX1, BY0), (BX1, BY1)),
@@ -101,16 +101,16 @@ PLACE = {
     "C2": (36, 47.29, 0),
     "R7": (32.67, 50, 0),
     "D4": (43.938, 48.5, 0),
-    "R1": (44, 32.55, 0),
-    "R4": (46.562, 41.17, 90),
-    "Q1": (47.5, 33.5, 0),
-    "R2": (51, 33.5, 0),
-    "C4": (52.5, 38, 90),
-    "R3": (55, 38, 90),
-    "Q2": (54.5, 33.5, 0),
-    "R6": (58, 33.5, 0),
-    "D3": (58, 42, 270),
-    "J2": (63.11, 40.315, 90),  # edge line lands on BX1, shell centered
+    "R1": (42.6, 29.05, 0),
+    "R4": (42.6, 31.4, 0),
+    "Q1": (46.5, 30, 0),
+    "R2": (47.44, 33.4, 90),
+    "C4": (43.7, 41.5, 90),
+    "R3": (46, 41.5, 90),
+    "Q2": (46.5, 36.8, 0),
+    "R6": (45.8, 45.7, 90),
+    "D3": (49, 42, 270),
+    "J2": (54.11, 40.315, 90),  # edge line lands on BX1, shell centered
 }
 
 for ref, (fpname, value, lcsc) in sorted(comps.items()):
@@ -209,8 +209,8 @@ def add_zone(layer, netname, x0, y0, x1, y1, thermal=False):
 # logic section, ACC_PWR under the connector end.  B.Cu: second ground pour
 # (thermal spokes so the through-hole parts stay hand-solderable).
 add_zone(pcbnew.In1_Cu, "GND", BX0, BY0, BX1, BY1)
-add_zone(pcbnew.In2_Cu, "VBUS", BX0, BY0, 56.0, BY1)
-add_zone(pcbnew.In2_Cu, "/ACC_PWR", 56.5, BY0, BX1, BY1)
+add_zone(pcbnew.In2_Cu, "VBUS", BX0, BY0, 47.0, BY1)
+add_zone(pcbnew.In2_Cu, "/ACC_PWR", 47.4, BY0, BX1, BY1)
 add_zone(pcbnew.B_Cu, "GND", BX0, BY0, BX1, BY1, thermal=True)
 
 filler = pcbnew.ZONE_FILLER(board)
@@ -229,10 +229,10 @@ def silk(textstr, x, y, layer=pcbnew.F_SilkS, size=1.0):
     board.Add(t)
 
 silk("k3pwr", 27.5, 22.0, size=1.5)
-silk("rev 0.1 W6JY", 38.0, 22.2)
-silk("K3 ACC", 56.5, 22.0)
+silk("rev 0.1 W6JY", 37.5, 22.2)
+silk("K3 ACC", 47.3, 22.0, size=0.9)
 silk("USB", 25.0, 44.5)
-silk("JLCJLCJLCJLC", 50.0, 46.0, layer=pcbnew.B_SilkS)  # JLC order number spot
+silk("JLCJLCJLCJLC", 43.0, 50.85, layer=pcbnew.B_SilkS)  # JLC order number spot
 
 pcbnew.SaveBoard(OUT, board)
 
