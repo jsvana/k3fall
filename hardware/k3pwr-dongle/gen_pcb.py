@@ -96,7 +96,7 @@ PLACE = {
     "D1": (38.5, 45.5, 0),
     "U1": (46.0, 36.0, 0),
     "C1": (50.5, 29.5, 0),
-    "C2": (41.5, 30.5, 90),
+    "C2": (40.5, 33.5, 90),
     "R7": (42.5, 45.5, 0),
     "D4": (47.0, 45.5, 0),
     "R1": (58.0, 30.0, 0),
@@ -146,6 +146,45 @@ for href, hx, hy in [("H1", 24.5, 24.5), ("H2", 24.5, 47.5), ("H3", 54.0, 36.0)]
                      | pcbnew.FP_EXCLUDE_FROM_BOM | pcbnew.FP_BOARD_ONLY)
     fp.Reference().SetVisible(False)
 
+# --- Plane stitching: via + fanout next to every SMD pad on a plane net ----
+PLANE_NETS = {"GND", "VBUS", "/ACC_PWR"}
+seen_vias = set()
+for fp in board.GetFootprints():
+    c = fp.GetPosition()
+    for pad in fp.Pads():
+        net = pad.GetNetname()
+        if net not in PLANE_NETS or pad.HasHole():
+            continue
+        p = pad.GetPosition()
+        if (p.x, p.y) in seen_vias:      # stacked pads (USB-C A/B rows)
+            continue
+        seen_vias.add((p.x, p.y))
+        dx, dy = p.x - c.x, p.y - c.y    # fan out away from the body
+        if len(fp.Pads()) > 2:
+            # ICs: escape along the pad's long axis (perpendicular to the row)
+            bb = pad.GetBoundingBox()
+            horiz = bb.GetWidth() >= bb.GetHeight()
+        else:
+            horiz = abs(dx) >= abs(dy)   # passives: along the part axis
+        if horiz:
+            vpos = VECTOR2I(p.x + (FromMM(1.2) if dx >= 0 else -FromMM(1.2)), p.y)
+        else:
+            vpos = VECTOR2I(p.x, p.y + (FromMM(1.2) if dy >= 0 else -FromMM(1.2)))
+        via = pcbnew.PCB_VIA(board)
+        via.SetViaType(pcbnew.VIATYPE_THROUGH)
+        via.SetLayerPair(pcbnew.F_Cu, pcbnew.B_Cu)
+        via.SetPosition(vpos)
+        via.SetDrill(FromMM(0.3))
+        via.SetWidth(FromMM(0.6))
+        via.SetNet(pad.GetNet())
+        board.Add(via)
+        tr = pcbnew.PCB_TRACK(board)
+        tr.SetStart(p); tr.SetEnd(vpos)
+        tr.SetWidth(FromMM(0.3))
+        tr.SetLayer(pcbnew.F_Cu)
+        tr.SetNet(pad.GetNet())
+        board.Add(tr)
+
 # --- Inner planes: In1 = GND, In2 = VBUS -----------------------------------
 def add_zone(layer, netname, x0, y0, x1, y1, thermal=False):
     zone = pcbnew.ZONE(board)
@@ -154,6 +193,9 @@ def add_zone(layer, netname, x0, y0, x1, y1, thermal=False):
     zone.SetIsFilled(True)
     zone.SetPadConnection(pcbnew.ZONE_CONNECTION_THERMAL if thermal
                           else pcbnew.ZONE_CONNECTION_FULL)
+    zone.SetIslandRemovalMode(pcbnew.ISLAND_REMOVAL_MODE_ALWAYS)
+    zone.SetLocalClearance(FromMM(0.25))   # keep webs between DSUB pins alive
+    zone.SetMinThickness(FromMM(0.2))
     outline = zone.Outline()
     outline.NewOutline()
     for px, py in [(x0, y0), (x1, y0), (x1, y1), (x0, y1)]:
