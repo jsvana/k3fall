@@ -10,7 +10,9 @@ Mounting: 2x M3 at the left corners, 1x M3 mid-board, plus the DSUB shell
 holes (3.2mm, 25mm apart) at the right.  Pads get nets from the exported
 netlist so "Update PCB from Schematic" matches cleanly; LCSC fields are
 carried onto footprints for JLC assembly.  Signal routing is left to the
-ratsnest — this is placement + planes only."""
+ratsnest — this is placement + planes only.  NOTE: the live board
+has hand edits (LED row, silk ref nudges); prefer in-place scripts over
+full regeneration."""
 import re, subprocess, sys, os
 
 import pcbnew
@@ -92,22 +94,22 @@ PLACE = {
     "D2": (40.0, 26.0, 0),
     "C3": (46.5, 26.0, 0),
     "U2": (36.5, 33.5, 0),
-    "R5": (33.0, 45.5, 0),
-    "D1": (38.5, 45.5, 0),
+    "R5": (33.175, 47.5, 0),
+    "D1": (39.562, 48.5, 0),
     "U1": (46.0, 36.0, 0),
     "C1": (50.5, 29.5, 0),
     "C2": (40.5, 33.5, 90),
-    "R7": (42.5, 45.5, 0),
-    "D4": (47.0, 45.5, 0),
-    "R1": (58.0, 30.0, 0),
-    "R4": (58.0, 26.0, 0),
-    "Q1": (62.0, 33.0, 0),
-    "R2": (62.0, 27.0, 90),
-    "C4": (62.0, 42.0, 0),
-    "R3": (66.5, 42.0, 0),
-    "Q2": (66.0, 36.0, 0),
-    "R6": (71.0, 31.0, 0),
-    "D3": (72.5, 42.0, 90),
+    "R7": (33.175, 49.5, 0),
+    "D4": (43.938, 48.5, 0),
+    "R1": (59.0, 32.55, 0),
+    "R4": (61.563, 28.5, 90),
+    "Q1": (62.5, 33.5, 0),
+    "R2": (66.0, 33.5, 0),
+    "C4": (67.0, 38.0, 90),
+    "R3": (69.5, 38.0, 90),
+    "Q2": (69.5, 33.5, 0),
+    "R6": (73.0, 33.5, 0),
+    "D3": (72.5, 42.0, 270),
     "J2": (77.11, 40.315, 90),  # edge line lands on BX1, shell centered
 }
 
