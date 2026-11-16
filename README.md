@@ -57,6 +57,7 @@ sudo usermod -a -G dialout,plugdev k3fall
 - **K3 serial (CAT) → Raspberry Pi**: Connect K3's RS-232 output (via USB-serial adapter) to Raspberry Pi USB.
   - K3 CAT speed: 38400 baud (set in K3 `CONFIG:RS232`).
   - Map the device in `config.toml` (typically `/dev/ttyUSB0` or `/dev/ttyUSB1`).
+- **Remote power (optional)**: the PWR button talks to a k3pwr device on USB serial (`[power]` in `config.toml`). Hardware and firmware live in [jsvana/k3pwr](https://github.com/jsvana/k3pwr).
 
 ## Configuration
 

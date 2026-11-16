@@ -2,9 +2,3 @@
 config.toml
 /image/*.img
 /image/*.img.xz
-/firmware/k3pwr/target/
-/firmware/k3pwr/.embuild/
-hardware/**/__pycache__/
-hardware/**/*-backups/
-hardware/**/*.kicad_prl
-hardware/**/~*.lck
